@@ -53,6 +53,7 @@ pub fn script_cd(path: &str) -> Vec<String> {
 ///
 /// Creates the directory with `mkdir -p`, then does the standard
 /// touch + echo + cd sequence.
+#[allow(dead_code)]
 pub fn script_mkdir_cd(path: &str) -> Vec<String> {
     let mut cmds = vec![format!("mkdir -p {}", quote_path(path))];
     cmds.extend(script_cd(path));
@@ -87,6 +88,7 @@ pub fn script_clone(path: &str, uri: &str) -> Vec<String> {
 ///
 /// If `repo` is `Some`, the worktree is created from the specified repo
 /// directory. Otherwise, it uses the current working directory.
+#[allow(dead_code)]
 pub fn script_worktree(path: &str, repo: Option<&str>) -> Vec<String> {
     let q_path = quote_path(path);
 

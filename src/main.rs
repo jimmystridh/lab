@@ -8,11 +8,9 @@ mod commands;
 mod entries;
 mod fuzzy;
 mod git;
-#[allow(dead_code)]
 mod script;
 mod shell;
 mod tui;
-#[allow(dead_code)]
 mod util;
 
 use std::env;
@@ -121,9 +119,14 @@ fn main() {
                     process::exit(exit_code);
                 }
                 Some(cli::Command::Clone) => {
-                    // TODO: Implement in commands/clone.rs
-                    eprintln!("lab: clone command not yet implemented");
-                    process::exit(1);
+                    let uri = args.args.first().map(|s| s.as_str());
+                    let custom_name = args.args.get(1).map(|s| s.as_str());
+                    let exit_code = commands::clone::cmd_clone(
+                        uri,
+                        custom_name,
+                        &labs_path.to_string_lossy(),
+                    );
+                    process::exit(exit_code);
                 }
                 Some(cli::Command::Worktree) => {
                     // TODO: Implement in commands/worktree.rs
@@ -131,6 +134,34 @@ fn main() {
                     process::exit(1);
                 }
                 Some(cli::Command::Exec) => {
+                    // Sub-dispatch: exec clone → cmd_clone
+                    if args.args.first().map(|s| s.as_str()) == Some("clone") {
+                        let sub_args: Vec<&str> =
+                            args.args.iter().skip(1).map(|s| s.as_str()).collect();
+                        let uri = sub_args.first().copied();
+                        let custom_name = sub_args.get(1).copied();
+                        let exit_code = commands::clone::cmd_clone(
+                            uri,
+                            custom_name,
+                            &labs_path.to_string_lossy(),
+                        );
+                        process::exit(exit_code);
+                    }
+
+                    // URL shorthand: if first arg looks like git URI → clone
+                    if let Some(first) = args.args.first() {
+                        if git::is_git_uri(first) {
+                            let uri = Some(first.as_str());
+                            let custom_name = args.args.get(1).map(|s| s.as_str());
+                            let exit_code = commands::clone::cmd_clone(
+                                uri,
+                                custom_name,
+                                &labs_path.to_string_lossy(),
+                            );
+                            process::exit(exit_code);
+                        }
+                    }
+
                     // Load entries and apply fuzzy matching
                     let all_entries = entries::load_entries(&labs_path);
                     let query = args.args.join(" ");
