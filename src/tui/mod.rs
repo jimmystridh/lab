@@ -4,15 +4,17 @@
 //! Rendering is always sent to stderr, while scripts remain on stdout.
 
 pub mod app;
+pub mod input;
 pub mod render;
 pub mod test_keys;
 
 use self::{
-    app::{App, Selection, TerminalSize},
+    app::{App, TerminalSize},
+    input::handle_key,
     test_keys::TestKeySource,
 };
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
+    event::{self, Event, KeyEventKind},
     terminal,
 };
 use ratatui::{backend::CrosstermBackend, layout::Rect, Terminal, TerminalOptions, Viewport};
@@ -160,98 +162,6 @@ fn drive_test_mode(app: &mut App, key_source: &mut TestKeySource) -> TuiOutcome 
 fn draw_app(terminal: &mut TuiTerminal, app: &App) -> io::Result<()> {
     terminal.draw(|frame| render::render(frame, app))?;
     Ok(())
-}
-
-fn handle_key(app: &mut App, key: KeyEvent) -> Option<TuiOutcome> {
-    match key.code {
-        KeyCode::Enter => Some(selection_outcome(app.current_selection())),
-        KeyCode::Esc => Some(TuiOutcome::Cancelled { emit_message: true }),
-        KeyCode::Backspace => {
-            app.backspace();
-            None
-        }
-        KeyCode::Up => {
-            app.move_up();
-            None
-        }
-        KeyCode::Down => {
-            app.move_down();
-            None
-        }
-        KeyCode::Home => {
-            app.move_to_top();
-            None
-        }
-        KeyCode::End => {
-            app.move_to_bottom();
-            None
-        }
-        KeyCode::PageUp => {
-            app.page_up();
-            None
-        }
-        KeyCode::PageDown => {
-            app.page_down();
-            None
-        }
-        KeyCode::Char(character) if key.modifiers.contains(KeyModifiers::CONTROL) => {
-            handle_control_key(app, character)
-        }
-        KeyCode::Char(character) => {
-            app.insert_char(character);
-            None
-        }
-        _ => None,
-    }
-}
-
-fn handle_control_key(app: &mut App, character: char) -> Option<TuiOutcome> {
-    match character.to_ascii_lowercase() {
-        'a' => {
-            app.move_input_to_start();
-            None
-        }
-        'b' => {
-            app.move_input_back();
-            None
-        }
-        'c' => Some(TuiOutcome::Cancelled { emit_message: true }),
-        'e' => {
-            app.move_input_to_end();
-            None
-        }
-        'f' => {
-            app.move_input_forward();
-            None
-        }
-        'j' | 'n' => {
-            app.move_down();
-            None
-        }
-        'k' => {
-            app.kill_to_end();
-            None
-        }
-        'p' => {
-            app.move_up();
-            None
-        }
-        'w' => {
-            app.delete_word_backward();
-            None
-        }
-        _ => None,
-    }
-}
-
-fn selection_outcome(selection: Option<Selection>) -> TuiOutcome {
-    match selection {
-        Some(Selection::Existing(path)) => TuiOutcome::Selected(path),
-        Some(Selection::Create(path)) => TuiOutcome::Create(path),
-        None => TuiOutcome::Cancelled {
-            emit_message: false,
-        },
-    }
 }
 
 fn is_press_or_repeat(kind: KeyEventKind) -> bool {

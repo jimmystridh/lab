@@ -831,6 +831,26 @@ mod tests {
     }
 
     #[test]
+    fn test_matched_characters_render_bold_yellow() {
+        let mut app = make_app(
+            vec![make_entry("2025-11-15-beta", false, SystemTime::now())],
+            80,
+            8,
+            None,
+        );
+        app.filtered = vec![MatchResult {
+            index: 0,
+            score: 5.7,
+            positions: vec![11, 12, 13],
+        }];
+
+        let rendered = snapshot(&app, true);
+        let selected_line = rendered.lines().nth(3).expect("selected line");
+
+        assert!(selected_line.contains("\x1b[1;33;48;5;238mbet\x1b[0m"));
+    }
+
+    #[test]
     fn test_symlink_entries_render_link_icon() {
         let mut app = make_app(
             vec![make_entry("linked-project", true, SystemTime::now())],
