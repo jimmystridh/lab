@@ -1,0 +1,140 @@
+{
+  "groupId": "cli-clone-a",
+  "surface": "shell-command",
+  "toolsUsed": [
+    "shell"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-CLI-013",
+      "title": "Clone emits git clone script with date-prefixed name",
+      "status": "pass",
+      "reasoning": "Exit 0; script contained git clone/mkdir/cd and generated basename '2026-04-13-user-repo', expected 2026-04-13-user-repo.",
+      "commands": [
+        {
+          "command": "/Users/js/code/rust/lab/target/debug/lab clone https://github.com/user/repo",
+          "exitCode": 0,
+          "labPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-clone-a-val-cli-013-ms5h19ef/labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "VAL-CLI-013-stdout.txt",
+          "VAL-CLI-013-stderr.txt",
+          "VAL-CLI-013-meta.txt"
+        ]
+      }
+    },
+    {
+      "id": "VAL-CLI-014",
+      "title": "Clone strips .git suffix",
+      "status": "pass",
+      "reasoning": "Exit 0; generated basename '2026-04-13-user-repo' from .git URL.",
+      "commands": [
+        {
+          "command": "/Users/js/code/rust/lab/target/debug/lab clone https://github.com/user/repo.git",
+          "exitCode": 0,
+          "labPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-clone-a-val-cli-014-plpius_g/labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "VAL-CLI-014-stdout.txt",
+          "VAL-CLI-014-stderr.txt",
+          "VAL-CLI-014-meta.txt"
+        ]
+      }
+    },
+    {
+      "id": "VAL-CLI-015",
+      "title": "Clone custom name overrides default",
+      "status": "pass",
+      "reasoning": "Exit 0; generated basename '2026-04-13-myproject', expected 2026-04-13-myproject.",
+      "commands": [
+        {
+          "command": "/Users/js/code/rust/lab/target/debug/lab clone https://github.com/user/repo myproject",
+          "exitCode": 0,
+          "labPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-clone-a-val-cli-015-o_wyh2f5/labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "VAL-CLI-015-stdout.txt",
+          "VAL-CLI-015-stderr.txt",
+          "VAL-CLI-015-meta.txt"
+        ]
+      }
+    },
+    {
+      "id": "VAL-CLI-016",
+      "title": "Clone parses SSH git@ URI",
+      "status": "pass",
+      "reasoning": "Exit 0; generated basename '2026-04-13-user-repo' from SSH URI.",
+      "commands": [
+        {
+          "command": "/Users/js/code/rust/lab/target/debug/lab clone git@github.com:user/repo",
+          "exitCode": 0,
+          "labPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-clone-a-val-cli-016-emkstn50/labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "VAL-CLI-016-stdout.txt",
+          "VAL-CLI-016-stderr.txt",
+          "VAL-CLI-016-meta.txt"
+        ]
+      }
+    },
+    {
+      "id": "VAL-CLI-017",
+      "title": "Clone parses non-GitHub hosts",
+      "status": "pass",
+      "reasoning": "HTTPS exit 0 basename '2026-04-13-user-repo'; SSH exit 0 basename '2026-04-13-user-repo'; both should resolve to 2026-04-13-user-repo.",
+      "commands": [
+        {
+          "command": "/Users/js/code/rust/lab/target/debug/lab clone https://gitlab.com/user/repo",
+          "exitCode": 0,
+          "labPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-clone-a-val-cli-017-aptqa1hc/labs"
+        },
+        {
+          "command": "/Users/js/code/rust/lab/target/debug/lab clone git@gitlab.com:user/repo",
+          "exitCode": 0,
+          "labPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-clone-a-val-cli-017-o3hjk86a/labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "VAL-CLI-017-https-stdout.txt",
+          "VAL-CLI-017-https-stderr.txt",
+          "VAL-CLI-017-https-meta.txt",
+          "VAL-CLI-017-ssh-stdout.txt",
+          "VAL-CLI-017-ssh-stderr.txt",
+          "VAL-CLI-017-ssh-meta.txt"
+        ]
+      }
+    },
+    {
+      "id": "VAL-CLI-018",
+      "title": "Clone without URL prints error",
+      "status": "pass",
+      "reasoning": "Exit 1 with stderr length 75; expected non-zero + stderr error.",
+      "commands": [
+        {
+          "command": "/Users/js/code/rust/lab/target/debug/lab clone",
+          "exitCode": 1,
+          "labPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-clone-a-val-cli-018-b3_0v518/labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "VAL-CLI-018-stdout.txt",
+          "VAL-CLI-018-stderr.txt",
+          "VAL-CLI-018-meta.txt"
+        ]
+      }
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 6 assertions: 6 passed, 0 failed, 0 blocked, 0 skipped."
+}

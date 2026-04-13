@@ -1,0 +1,240 @@
+{
+  "groupId": "cli-flags-scripts",
+  "surface": "shell-command",
+  "testedAt": "2026-04-13T07:02:47.991470+00:00",
+  "isolation": {
+    "tempRoot": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6",
+    "home": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/home",
+    "defaultLabPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/labs-default",
+    "overridePath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path",
+    "binary": "/Users/js/code/rust/lab/target/debug/lab",
+    "surface": "shell-command"
+  },
+  "toolsUsed": [
+    "shell-command"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-CLI-026",
+      "title": "--path flag overrides LAB_PATH",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `lab --path <dir> --and-keys=ENTER exec` and `lab --path=<dir> --and-exit exec` in isolated temp HOME/LAB_PATH",
+          "expected": "Both --path forms route exec to override directory",
+          "observed": "spaced_form_path=True, equals_form_alt_project=True"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-flags-scripts/VAL-CLI-026.txt"
+        ],
+        "commands": [
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path --and-keys=ENTER exec",
+            "exitCode": 0
+          },
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path=/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path --and-exit exec",
+            "exitCode": 1
+          }
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-027",
+      "title": "--no-colors and NO_COLOR disable ANSI colors",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run exec frame with `--no-colors` and with `NO_COLOR=1`",
+          "expected": "No ANSI SGR style sequences in output",
+          "observed": "no_colors_has_sgr=False, no_color_env_has_sgr=False"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-flags-scripts/VAL-CLI-027.txt"
+        ],
+        "commands": [
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path --no-colors --and-exit exec",
+            "exitCode": 1
+          },
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path --and-exit exec",
+            "exitCode": 1,
+            "env": {
+              "NO_COLOR": "1"
+            }
+          }
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-028",
+      "title": "Script output starts with warning comment",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Generate an exec script via ENTER selection",
+          "expected": "First stdout line starts with '# if you can read this'",
+          "observed": "# if you can read this, you didn't launch lab from an alias. run lab --help."
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-flags-scripts/VAL-CLI-028.txt"
+        ],
+        "commands": [
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path --and-keys=ENTER exec",
+            "exitCode": 0
+          }
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-029",
+      "title": "Script commands chained with && backslash",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `lab exec clone <url>`",
+          "expected": "Script uses `&& \\` chaining and two-space continued indentation",
+          "observed": "and_backslash=True, two_space_indent=True"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-flags-scripts/VAL-CLI-029.txt"
+        ],
+        "commands": [
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path exec clone https://github.com/user/repo",
+            "exitCode": 0
+          }
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-030",
+      "title": "Path quoting uses single quotes with proper escaping",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run clone script generation with custom name containing apostrophe",
+          "expected": "Output paths are single-quoted and apostrophe escaped as `'\"'\"'`",
+          "observed": "escape_found=True"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-flags-scripts/VAL-CLI-030.txt"
+        ],
+        "commands": [
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path exec clone https://github.com/user/repo 'o'\"'\"'hare'",
+            "exitCode": 0
+          }
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-031",
+      "title": "Exit code 0 on success, 1 on cancel",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run ENTER selection and ESC cancellation flows",
+          "expected": "ENTER exits 0, ESC exits 1",
+          "observed": "enter_exit=0, esc_exit=1"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-flags-scripts/VAL-CLI-031.txt"
+        ],
+        "commands": [
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path --and-keys=ENTER exec",
+            "exitCode": 0
+          },
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path --and-keys=ESC exec",
+            "exitCode": 1
+          }
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-032",
+      "title": "URL shorthand triggers clone workflow",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `lab exec cd <url>` and `lab exec <url>`",
+          "expected": "Both trigger clone workflow script",
+          "observed": "exec_cd_clone=True, bare_clone=True"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-flags-scripts/VAL-CLI-032.txt"
+        ],
+        "commands": [
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path --and-exit exec cd https://github.com/user/repo",
+            "exitCode": 0
+          },
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path --and-exit exec https://github.com/user/repo",
+            "exitCode": 0
+          }
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-033",
+      "title": "Exec sub-dispatches correctly",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `lab exec clone`, `lab exec worktree`, and `lab exec cd`",
+          "expected": "Each sub-dispatches to correct output script type",
+          "observed": "clone=True, worktree=True, cd=True"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-flags-scripts/VAL-CLI-033.txt"
+        ],
+        "commands": [
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path exec clone https://github.com/user/repo",
+            "exitCode": 0
+          },
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path exec worktree /Users/js/code/rust/lab featurex",
+            "exitCode": 0
+          },
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-flags-scripts-87ruf7s6/alt-path --and-keys=ENTER exec cd",
+            "exitCode": 0
+          }
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 8 assertions: 8 passed, 0 failed, 0 blocked."
+}

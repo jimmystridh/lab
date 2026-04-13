@@ -1,0 +1,106 @@
+{
+  "milestone": "cli-foundation",
+  "round": 1,
+  "status": "fail",
+  "assertionsSummary": {
+    "total": 58,
+    "passed": 57,
+    "failed": 0,
+    "blocked": 1
+  },
+  "passedAssertions": [
+    "VAL-CLI-001",
+    "VAL-CLI-002",
+    "VAL-CLI-003",
+    "VAL-CLI-004",
+    "VAL-CLI-005",
+    "VAL-CLI-006",
+    "VAL-CLI-007",
+    "VAL-CLI-008",
+    "VAL-CLI-009",
+    "VAL-CLI-010",
+    "VAL-CLI-011",
+    "VAL-CLI-012",
+    "VAL-CLI-013",
+    "VAL-CLI-014",
+    "VAL-CLI-015",
+    "VAL-CLI-016",
+    "VAL-CLI-017",
+    "VAL-CLI-018",
+    "VAL-CLI-019",
+    "VAL-CLI-020",
+    "VAL-CLI-021",
+    "VAL-CLI-022",
+    "VAL-CLI-023",
+    "VAL-CLI-024",
+    "VAL-CLI-025",
+    "VAL-CLI-026",
+    "VAL-CLI-027",
+    "VAL-CLI-028",
+    "VAL-CLI-029",
+    "VAL-CLI-030",
+    "VAL-CLI-031",
+    "VAL-CLI-032",
+    "VAL-CLI-033",
+    "VAL-CLI-034",
+    "VAL-CLI-035",
+    "VAL-CLI-036",
+    "VAL-CLI-037",
+    "VAL-CLI-039",
+    "VAL-CLI-040",
+    "VAL-CLI-041",
+    "VAL-CROSS-001",
+    "VAL-CROSS-004",
+    "VAL-CROSS-005",
+    "VAL-CROSS-007",
+    "VAL-CROSS-008",
+    "VAL-FUZZY-001",
+    "VAL-FUZZY-002",
+    "VAL-FUZZY-003",
+    "VAL-FUZZY-004",
+    "VAL-FUZZY-005",
+    "VAL-FUZZY-006",
+    "VAL-FUZZY-007",
+    "VAL-FUZZY-008",
+    "VAL-FUZZY-009",
+    "VAL-FUZZY-010",
+    "VAL-FUZZY-011",
+    "VAL-FUZZY-013"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [
+    {
+      "id": "VAL-CLI-038",
+      "blockedBy": "Rename/graduate script surfaces are not available in cli-foundation user surface (reported as \"TUI selector not yet implemented (milestone 2)\"); assertion deferred until tui-actions."
+    }
+  ],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Added explicit concurrency limits for shell-command and cargo-test surfaces and added Flow Validator Guidance sections for shell-command and cargo-test isolation.",
+      "source": "setup"
+    }
+  ],
+  "flowMeta": {
+    "reportsRead": [
+      "cli-clone-a.json",
+      "cli-env-tail.json",
+      "cli-flags-scripts.json",
+      "cli-init-a.json",
+      "cli-init-output.json",
+      "cli-install-marker.json",
+      "cli-worktree.json",
+      "cross-routing.json",
+      "fuzzy-cargo.json",
+      "fuzzy-shell.json"
+    ],
+    "toolsUsed": [
+      "cargo test",
+      "shell",
+      "shell-command"
+    ],
+    "frictions": [],
+    "blockers": []
+  },
+  "previousRound": null
+}

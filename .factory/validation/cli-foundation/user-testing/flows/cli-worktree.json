@@ -1,0 +1,182 @@
+{
+  "groupId": "cli-worktree",
+  "surface": "shell-command",
+  "testedAt": "2026-04-13T06:59:58.601027+00:00",
+  "toolsUsed": [
+    "shell"
+  ],
+  "isolation": {
+    "repo": "/Users/js/code/rust/lab",
+    "binary": "/Users/js/code/rust/lab/target/debug/lab",
+    "evidenceDir": "/Users/js/.factory/missions/4e064f1d-55c5-4e80-9c43-b2e62ac80846/evidence/cli-foundation/cli-worktree",
+    "tempRootsByAssertion": {
+      "VAL-CLI-019": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-019-3p7wao2k",
+      "VAL-CLI-020": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-020-05qdq6uc",
+      "VAL-CLI-021": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-021-_7sk7akj",
+      "VAL-CLI-022": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-022-1k2zoct6",
+      "VAL-CLI-023": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-023-ypey5_77",
+      "VAL-CLI-024": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-024-ivuep0xs",
+      "VAL-CLI-025": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-025-11kradbv"
+    },
+    "notes": "Each assertion used its own mktemp root with separate git and non-git directories and isolated --path labs root."
+  },
+  "assertionResults": [
+    {
+      "id": "VAL-CLI-019",
+      "title": "Worktree emits git worktree add script",
+      "status": "pass",
+      "reasoning": "exit=0; worktree_add=True; date_prefixed=True.",
+      "commands": [
+        {
+          "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-019-3p7wao2k/labs worktree /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-019-3p7wao2k/git-repo myfeature",
+          "exitCode": 0,
+          "cwd": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-019-3p7wao2k/git-repo",
+          "labPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-019-3p7wao2k/labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-worktree/VAL-CLI-019-stdout.txt",
+          "cli-foundation/cli-worktree/VAL-CLI-019-stderr.txt",
+          "cli-foundation/cli-worktree/VAL-CLI-019-meta.txt"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-020",
+      "title": "Worktree from non-git dir creates plain directory",
+      "status": "pass",
+      "reasoning": "exit=0; mkdir=True; no_worktree_add=True.",
+      "commands": [
+        {
+          "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-020-05qdq6uc/labs worktree plaindir",
+          "exitCode": 0,
+          "cwd": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-020-05qdq6uc/plain-dir",
+          "labPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-020-05qdq6uc/labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-worktree/VAL-CLI-020-stdout.txt",
+          "cli-foundation/cli-worktree/VAL-CLI-020-stderr.txt",
+          "cli-foundation/cli-worktree/VAL-CLI-020-meta.txt"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-021",
+      "title": "Worktree resolves name collision with numeric suffix",
+      "status": "pass",
+      "reasoning": "exit=0; collision_resolved_to_feature2=True.",
+      "commands": [
+        {
+          "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-021-_7sk7akj/labs worktree /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-021-_7sk7akj/git-repo feature1",
+          "exitCode": 0,
+          "cwd": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-021-_7sk7akj/git-repo",
+          "labPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-021-_7sk7akj/labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-worktree/VAL-CLI-021-stdout.txt",
+          "cli-foundation/cli-worktree/VAL-CLI-021-stderr.txt",
+          "cli-foundation/cli-worktree/VAL-CLI-021-meta.txt"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-022",
+      "title": "Worktree resolves name collision with -2 suffix",
+      "status": "pass",
+      "reasoning": "exit=0; collision_resolved_to_nonum_2=True.",
+      "commands": [
+        {
+          "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-022-1k2zoct6/labs worktree /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-022-1k2zoct6/git-repo nonum",
+          "exitCode": 0,
+          "cwd": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-022-1k2zoct6/git-repo",
+          "labPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-022-1k2zoct6/labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-worktree/VAL-CLI-022-stdout.txt",
+          "cli-foundation/cli-worktree/VAL-CLI-022-stderr.txt",
+          "cli-foundation/cli-worktree/VAL-CLI-022-meta.txt"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-023",
+      "title": "Dot shorthand with name creates worktree in git repo",
+      "status": "pass",
+      "reasoning": "exit=0; dot_shorthand_worktree_add=True.",
+      "commands": [
+        {
+          "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-023-ypey5_77/labs . dotfeature",
+          "exitCode": 0,
+          "cwd": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-023-ypey5_77/git-repo",
+          "labPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-023-ypey5_77/labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-worktree/VAL-CLI-023-stdout.txt",
+          "cli-foundation/cli-worktree/VAL-CLI-023-stderr.txt",
+          "cli-foundation/cli-worktree/VAL-CLI-023-meta.txt"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-024",
+      "title": "Dot shorthand without name prints error",
+      "status": "pass",
+      "reasoning": "exit=1; non_zero=True; stderr_mentions_name=True.",
+      "commands": [
+        {
+          "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-024-ivuep0xs/labs .",
+          "exitCode": 1,
+          "cwd": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-024-ivuep0xs/git-repo",
+          "labPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-024-ivuep0xs/labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-worktree/VAL-CLI-024-stdout.txt",
+          "cli-foundation/cli-worktree/VAL-CLI-024-stderr.txt",
+          "cli-foundation/cli-worktree/VAL-CLI-024-meta.txt"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-025",
+      "title": "Dot shorthand without .git creates plain directory",
+      "status": "pass",
+      "reasoning": "exit=0; mkdir=True; no_worktree_add=True.",
+      "commands": [
+        {
+          "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-025-11kradbv/labs . dirname",
+          "exitCode": 0,
+          "cwd": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-025-11kradbv/plain-dir",
+          "labPath": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cli-worktree-val-cli-025-11kradbv/labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cli-worktree/VAL-CLI-025-stdout.txt",
+          "cli-foundation/cli-worktree/VAL-CLI-025-stderr.txt",
+          "cli-foundation/cli-worktree/VAL-CLI-025-meta.txt"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 7 assertions: 7 passed, 0 failed, 0 blocked, 0 skipped."
+}

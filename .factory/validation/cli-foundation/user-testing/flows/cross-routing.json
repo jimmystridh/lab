@@ -1,0 +1,121 @@
+{
+  "groupId": "cross-routing",
+  "surface": "shell-command",
+  "toolsUsed": [
+    "shell"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-CROSS-001",
+      "title": "Shell init eval + TUI selection changes directory",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Eval `lab init` output in bash and run `lab --and-keys ENTER` with LAB_PATH set to isolated temp dir containing one entry",
+          "expected": "Shell lands in selected entry directory",
+          "observed": "PWD=/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cross-routing-001-labs-jx2c0eun/2026-04-13-alpha (expected /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cross-routing-001-labs-jx2c0eun/2026-04-13-alpha)"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cross-routing/VAL-CROSS-001.txt"
+        ],
+        "commandExitCode": 0
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-004",
+      "title": "Clone via CLI and URL shorthand produce equivalent scripts",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `lab exec clone <url>` and `lab exec <url>` in same isolated LAB_PATH",
+          "expected": "Equivalent script structure with same clone target path",
+          "observed": "equivalent=True, git_clone_present=True"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cross-routing/VAL-CROSS-004.txt"
+        ],
+        "commandExitCodes": [
+          0,
+          0
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-005",
+      "title": "--path override applies across all commands",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run cd/select, clone, and worktree flows with `--path <custom>`",
+          "expected": "All generated scripts reference override path",
+          "observed": "cd=True, clone=True, worktree=True"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cross-routing/VAL-CROSS-005.txt"
+        ],
+        "commandExitCodes": {
+          "cd": 0,
+          "clone": 0,
+          "worktree": 0
+        }
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-007",
+      "title": "Shell eval integration for bash",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Validate `lab exec` scripts with `bash -n` and eval cd script in bash",
+          "expected": "`bash -n` succeeds and eval changes PWD to selected dir",
+          "observed": "bash_n={cd:0,clone:0,worktree:0}, pwd=/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/cross-routing-007-labs-82bgsncp/2026-04-13-syntax-target"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cross-routing/VAL-CROSS-007.txt"
+        ],
+        "commandExitCodes": {
+          "script_cd": 0,
+          "script_clone": 0,
+          "script_worktree": 0,
+          "bash_n_cd": 0,
+          "bash_n_clone": 0,
+          "bash_n_worktree": 0,
+          "eval_cd_script": 0
+        }
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-008",
+      "title": "Error handling: missing dir auto-created",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `lab exec --and-exit` with LAB_PATH pointing to non-existent directory",
+          "expected": "Directory is created and TUI exits without crash",
+          "observed": "exit=1, dir_created=True, stderr_bytes=357"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/cross-routing/VAL-CROSS-008.txt"
+        ],
+        "commandExitCode": 1
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": []
+}

@@ -1,0 +1,132 @@
+{
+  "groupId": "cli-init-a",
+  "surface": "shell-command",
+  "toolsUsed": [
+    "shell"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-CLI-001",
+      "title": "Help flag prints usage",
+      "status": "pass",
+      "reasoning": "Exit 0; stderr contains expected help text phrase: True.",
+      "commands": [
+        {
+          "command": "\"/Users/js/code/rust/lab/target/debug/lab\" --help",
+          "exitCode": 0,
+          "labPath": "/tmp/cli-init-a-cqbfvkim/val-cli-001-labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "VAL-CLI-001-stdout.txt",
+          "VAL-CLI-001-stderr.txt",
+          "VAL-CLI-001-meta.txt"
+        ]
+      }
+    },
+    {
+      "id": "VAL-CLI-002",
+      "title": "Version flag prints version",
+      "status": "pass",
+      "reasoning": "Exit 0; stderr matches version regex: True.",
+      "commands": [
+        {
+          "command": "\"/Users/js/code/rust/lab/target/debug/lab\" --version",
+          "exitCode": 0,
+          "labPath": "/tmp/cli-init-a-cqbfvkim/val-cli-002-labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "VAL-CLI-002-stdout.txt",
+          "VAL-CLI-002-stderr.txt",
+          "VAL-CLI-002-meta.txt"
+        ]
+      }
+    },
+    {
+      "id": "VAL-CLI-003",
+      "title": "No arguments prints help and exits 2",
+      "status": "pass",
+      "reasoning": "Exit 2; stderr contains expected help text phrase: True.",
+      "commands": [
+        {
+          "command": "\"/Users/js/code/rust/lab/target/debug/lab\"",
+          "exitCode": 2,
+          "labPath": "/tmp/cli-init-a-cqbfvkim/val-cli-003-labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "VAL-CLI-003-stdout.txt",
+          "VAL-CLI-003-stderr.txt",
+          "VAL-CLI-003-meta.txt"
+        ]
+      }
+    },
+    {
+      "id": "VAL-CLI-004",
+      "title": "Init outputs bash/zsh shell function",
+      "status": "pass",
+      "reasoning": "Exit 0; stdout contains 'lab()': True.",
+      "commands": [
+        {
+          "command": "SHELL=/bin/bash \"/Users/js/code/rust/lab/target/debug/lab\" init \"/tmp/cli-init-a-cqbfvkim/val-cli-004-labs\"",
+          "exitCode": 0,
+          "labPath": "/tmp/cli-init-a-cqbfvkim/val-cli-004-labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "VAL-CLI-004-stdout.txt",
+          "VAL-CLI-004-stderr.txt",
+          "VAL-CLI-004-meta.txt"
+        ]
+      }
+    },
+    {
+      "id": "VAL-CLI-005",
+      "title": "Init outputs fish shell function",
+      "status": "pass",
+      "reasoning": "Exit 0; stdout contains 'function lab': True.",
+      "commands": [
+        {
+          "command": "SHELL=/usr/bin/fish \"/Users/js/code/rust/lab/target/debug/lab\" init \"/tmp/cli-init-a-cqbfvkim/val-cli-005-labs\"",
+          "exitCode": 0,
+          "labPath": "/tmp/cli-init-a-cqbfvkim/val-cli-005-labs"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "VAL-CLI-005-stdout.txt",
+          "VAL-CLI-005-stderr.txt",
+          "VAL-CLI-005-meta.txt"
+        ]
+      }
+    },
+    {
+      "id": "VAL-CLI-006",
+      "title": "Init embeds binary path and --path argument",
+      "status": "pass",
+      "reasoning": "Exit 0; stdout contains binary path: True; stdout contains --path argument for explicit path: True.",
+      "commands": [
+        {
+          "command": "SHELL=/bin/bash \"/Users/js/code/rust/lab/target/debug/lab\" init \"/tmp/cli-init-a-cqbfvkim/val-cli-006/custom/path\"",
+          "exitCode": 0,
+          "labPath": "/tmp/cli-init-a-cqbfvkim/val-cli-006/custom/path"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "VAL-CLI-006-stdout.txt",
+          "VAL-CLI-006-stderr.txt",
+          "VAL-CLI-006-meta.txt"
+        ]
+      }
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 6 assertions: 6 passed, 0 failed, 0 blocked, 0 skipped."
+}

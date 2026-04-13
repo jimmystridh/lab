@@ -1,0 +1,115 @@
+{
+  "groupId": "fuzzy-cargo",
+  "surface": "cargo-test",
+  "testedAt": "2026-04-13T06:53:29.403485+00:00",
+  "toolsUsed": [
+    "cargo test"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-FUZZY-004",
+      "title": "Strict subsequence requirement",
+      "status": "pass",
+      "reasoning": "Targeted unit test passed: out-of-order query 'ba' does not match 'ab-only'.",
+      "commands": [
+        {
+          "command": "cargo test --manifest-path /Users/js/code/rust/lab/Cargo.toml test_strict_subsequence_requirement",
+          "exitCode": 0
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/fuzzy-cargo/VAL-FUZZY-004-cargo-test.log"
+        ]
+      }
+    },
+    {
+      "id": "VAL-FUZZY-005",
+      "title": "Word boundary bonus",
+      "status": "pass",
+      "reasoning": "Targeted word-boundary unit tests passed for both position 0 and post-hyphen boundary cases.",
+      "commands": [
+        {
+          "command": "cargo test --manifest-path /Users/js/code/rust/lab/Cargo.toml test_word_boundary_bonus_",
+          "exitCode": 0
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/fuzzy-cargo/VAL-FUZZY-005-cargo-test.log"
+        ]
+      }
+    },
+    {
+      "id": "VAL-FUZZY-006",
+      "title": "Proximity bonus for consecutive matches",
+      "status": "pass",
+      "reasoning": "Comparison unit test passed: consecutive 'proj' match scores higher than scattered 'pjt'.",
+      "commands": [
+        {
+          "command": "cargo test --manifest-path /Users/js/code/rust/lab/Cargo.toml test_proximity_bonus_scattered",
+          "exitCode": 0
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/fuzzy-cargo/VAL-FUZZY-006-cargo-test.log"
+        ]
+      }
+    },
+    {
+      "id": "VAL-FUZZY-007",
+      "title": "Length penalty prefers shorter names",
+      "status": "pass",
+      "reasoning": "Targeted unit test passed: 'project' ranks above 'project-with-long-suffix' for query 'proj'.",
+      "commands": [
+        {
+          "command": "cargo test --manifest-path /Users/js/code/rust/lab/Cargo.toml test_length_penalty_prefers_shorter_names",
+          "exitCode": 0
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/fuzzy-cargo/VAL-FUZZY-007-cargo-test.log"
+        ]
+      }
+    },
+    {
+      "id": "VAL-FUZZY-008",
+      "title": "Density multiplier prefers concentrated matches",
+      "status": "pass",
+      "reasoning": "Targeted unit test passed: concentrated 'ab' in 'abcdef' scores higher than scattered 'a----b'.",
+      "commands": [
+        {
+          "command": "cargo test --manifest-path /Users/js/code/rust/lab/Cargo.toml test_density_multiplier_prefers_concentrated_matches",
+          "exitCode": 0
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/fuzzy-cargo/VAL-FUZZY-008-cargo-test.log"
+        ]
+      }
+    },
+    {
+      "id": "VAL-FUZZY-009",
+      "title": "Date prefix bonus (+2.0)",
+      "status": "pass",
+      "reasoning": "Date-prefix bonus unit test passed, including exact +2.0 base-score differential check.",
+      "commands": [
+        {
+          "command": "cargo test --manifest-path /Users/js/code/rust/lab/Cargo.toml test_date_prefix_bonus",
+          "exitCode": 0
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/fuzzy-cargo/VAL-FUZZY-009-cargo-test.log"
+        ]
+      }
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 6 assertions: 6 passed, 0 failed, 0 blocked, 0 skipped."
+}

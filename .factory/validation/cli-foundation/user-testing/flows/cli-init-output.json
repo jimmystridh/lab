@@ -1,0 +1,47 @@
+{
+  "groupId": "cli-init-output",
+  "surface": "shell-command",
+  "toolsUsed": [
+    "shell"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-CLI-007",
+      "status": "pass",
+      "reason": "bash/zsh init includes stderr redirect to /dev/tty",
+      "evidence": [
+        "/Users/js/.factory/missions/4e064f1d-55c5-4e80-9c43-b2e62ac80846/evidence/cli-foundation/cli-init-output/VAL-CLI-007-stdout.txt",
+        "/Users/js/.factory/missions/4e064f1d-55c5-4e80-9c43-b2e62ac80846/evidence/cli-foundation/cli-init-output/VAL-CLI-007-meta.txt"
+      ]
+    },
+    {
+      "id": "VAL-CLI-008",
+      "status": "pass",
+      "reason": "bash -n accepted init output syntax",
+      "evidence": [
+        "/Users/js/.factory/missions/4e064f1d-55c5-4e80-9c43-b2e62ac80846/evidence/cli-foundation/cli-init-output/VAL-CLI-008-meta.txt",
+        "/Users/js/.factory/missions/4e064f1d-55c5-4e80-9c43-b2e62ac80846/evidence/cli-foundation/cli-init-output/VAL-CLI-008-bash-n-stderr.txt"
+      ]
+    },
+    {
+      "id": "VAL-CLI-009",
+      "status": "pass",
+      "reason": "fish init output contains no bash-specific $() or $?",
+      "evidence": [
+        "/Users/js/.factory/missions/4e064f1d-55c5-4e80-9c43-b2e62ac80846/evidence/cli-foundation/cli-init-output/VAL-CLI-009-stdout.txt",
+        "/Users/js/.factory/missions/4e064f1d-55c5-4e80-9c43-b2e62ac80846/evidence/cli-foundation/cli-init-output/VAL-CLI-009-meta.txt"
+      ]
+    },
+    {
+      "id": "VAL-CLI-010",
+      "status": "pass",
+      "reason": "default init output references LAB_PATH fallback semantics",
+      "evidence": [
+        "/Users/js/.factory/missions/4e064f1d-55c5-4e80-9c43-b2e62ac80846/evidence/cli-foundation/cli-init-output/VAL-CLI-010-stdout.txt",
+        "/Users/js/.factory/missions/4e064f1d-55c5-4e80-9c43-b2e62ac80846/evidence/cli-foundation/cli-init-output/VAL-CLI-010-meta.txt"
+      ]
+    }
+  ],
+  "frictions": [],
+  "blockers": []
+}

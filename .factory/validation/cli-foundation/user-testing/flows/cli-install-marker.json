@@ -1,0 +1,74 @@
+{
+  "groupId": "cli-install-marker",
+  "testedAt": "2026-04-13T07:06:04.414396+00:00",
+  "isolation": {
+    "surface": "shell-command",
+    "binary": "/Users/js/code/rust/lab/target/debug/lab",
+    "home": "/tmp/lab-install-marker.nEhHxw",
+    "shell": "/bin/zsh",
+    "rcFileDetected": "/tmp/lab-install-marker.nEhHxw/.zshrc"
+  },
+  "toolsUsed": [
+    "shell-command"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-CLI-011",
+      "title": "Install appends init to RC file with marker",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `lab install /tmp/labs` in isolated HOME",
+          "expected": "Install exits 0 and appends shell integration marker/function to detected RC file",
+          "observed": "exit=0, rcFile=/tmp/lab-install-marker.nEhHxw/.zshrc, marker_present=True, function_present=True"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "cli-foundation/cli-install-marker/VAL-CLI-011-transcript.txt",
+          "cli-foundation/cli-install-marker/VAL-CLI-011-stdout.txt",
+          "cli-foundation/cli-install-marker/VAL-CLI-011-stderr.txt",
+          "cli-foundation/cli-install-marker/VAL-CLI-011-rc-after.txt"
+        ],
+        "command": "lab install /tmp/labs",
+        "stdout": "",
+        "stderr": "Added lab shell integration to /tmp/lab-install-marker.nEhHxw/.zshrc\nRestart your shell or run: source /tmp/lab-install-marker.nEhHxw/.zshrc",
+        "exitCode": 0,
+        "rcFile": "/tmp/lab-install-marker.nEhHxw/.zshrc"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-012",
+      "title": "Install detects existing marker and skips",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `lab install` again with existing marker",
+          "expected": "Exit 0, print already installed, and leave RC file unchanged",
+          "observed": "exit=0, already_installed=True, unchanged=True"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "cli-foundation/cli-install-marker/VAL-CLI-012-transcript.txt",
+          "cli-foundation/cli-install-marker/VAL-CLI-012-stdout.txt",
+          "cli-foundation/cli-install-marker/VAL-CLI-012-stderr.txt",
+          "cli-foundation/cli-install-marker/VAL-CLI-012-rc-after.txt"
+        ],
+        "command": "lab install",
+        "stdout": "",
+        "stderr": "lab is already installed in /tmp/lab-install-marker.nEhHxw/.zshrc\nTo reinstall, remove the '# lab shell integration' block first.",
+        "exitCode": 0,
+        "stderrContainsAlreadyInstalled": true,
+        "rcUnchanged": true,
+        "hashBefore": "d0582b8f9bd9fbe3cbf6e05c96ebbaf43994cef7e25fe3364a91329624c54497",
+        "hashAfter": "d0582b8f9bd9fbe3cbf6e05c96ebbaf43994cef7e25fe3364a91329624c54497"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 2 assertions: 2 passed, 0 failed, 0 blocked."
+}

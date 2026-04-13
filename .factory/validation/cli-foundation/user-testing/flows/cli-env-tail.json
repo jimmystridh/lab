@@ -1,0 +1,189 @@
+{
+  "groupId": "cli-env-tail",
+  "testedAt": "2026-04-13T07:07:12.557134+00:00",
+  "isolation": {
+    "surface": "shell-command",
+    "binary": "/Users/js/code/rust/lab/target/debug/lab",
+    "tempRoot": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/lab-cli-env-tail-tp4b4w62",
+    "homeStrategy": "mktemp HOME used for all assertions; read-only RC test confined to temp HOME/.zshrc",
+    "labPathStrategy": "mktemp LAB_PATH used per assertion/group"
+  },
+  "toolsUsed": [
+    "shell-command"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-CLI-034",
+      "title": "LAB_PATH environment variable sets default root",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `lab exec clone https://github.com/user/repo` with LAB_PATH set to temp custom root",
+          "expected": "Script path references custom LAB_PATH root",
+          "observed": "stdout script used /.../labpath-034-custom-root/..."
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "cli-foundation/cli-env-tail/VAL-CLI-034-lab_path_default_root.txt"
+        ],
+        "network": "n/a",
+        "consoleErrors": "n/a"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-035",
+      "title": "Non-existent LAB_PATH is auto-created",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `lab --and-exit exec` with LAB_PATH set to non-existent nested temp path",
+          "expected": "LAB_PATH directory is auto-created",
+          "observed": "command exited 1 (expected for --and-exit no selection) and LAB_PATH directory existed after invocation"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "cli-foundation/cli-env-tail/VAL-CLI-035-lab_path_autocreate.txt"
+        ],
+        "network": "n/a",
+        "consoleErrors": "n/a"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-036",
+      "title": "cd script touches then cds to directory",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Create an existing entry under temp LAB_PATH and run `lab --and-keys '\\r' exec`",
+          "expected": "stdout contains `touch '<path>'` then `cd '<path>'`",
+          "observed": "stdout emitted touch + echo + cd chain for selected existing directory"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "cli-foundation/cli-env-tail/VAL-CLI-036-cd_touch_then_cd.txt"
+        ],
+        "network": "n/a",
+        "consoleErrors": "n/a"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-037",
+      "title": "mkdir script creates then cds to directory",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `lab --and-keys 'newproj\\r' exec` in empty temp LAB_PATH",
+          "expected": "stdout contains `mkdir -p '<path>'` then `cd '<path>'`",
+          "observed": "stdout emitted mkdir -p + touch + echo + cd chain for new directory"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "cli-foundation/cli-env-tail/VAL-CLI-037-mkdir_then_cd.txt"
+        ],
+        "network": "n/a",
+        "consoleErrors": "n/a"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-038",
+      "title": "All scripts echo the final path",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Generate cd/mkdir/clone/worktree scripts",
+          "expected": "each script type includes `echo '<final-path>'`",
+          "observed": "cd, mkdir, clone, and worktree outputs all included `echo '<path>'`"
+        },
+        {
+          "action": "Attempt rename and graduate script surfaces via `lab exec rename ...` and `lab exec graduate ...`",
+          "expected": "rename and graduate script outputs including final-path echo",
+          "observed": "both commands exited 1 with `lab: TUI selector not yet implemented (milestone 2)` and no script output"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "cli-foundation/cli-env-tail/VAL-CLI-038-echo_cd.txt",
+          "cli-foundation/cli-env-tail/VAL-CLI-038-echo_mkdir.txt",
+          "cli-foundation/cli-env-tail/VAL-CLI-038-echo_clone.txt",
+          "cli-foundation/cli-env-tail/VAL-CLI-038-echo_worktree.txt",
+          "cli-foundation/cli-env-tail/VAL-CLI-038-rename_attempt.txt",
+          "cli-foundation/cli-env-tail/VAL-CLI-038-graduate_attempt.txt"
+        ],
+        "network": "n/a",
+        "consoleErrors": "n/a"
+      },
+      "issues": "Rename and graduate script surfaces were not available; unable to confirm required final-path echo for those script types."
+    },
+    {
+      "id": "VAL-CLI-039",
+      "title": "Clone script emits informational echo before git clone",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `lab exec clone https://github.com/user/repo`",
+          "expected": "stdout has informational `echo` about using git clone before `git clone` command",
+          "observed": "output contained `echo 'Using git clone...'` line before `git clone ...` line"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "cli-foundation/cli-env-tail/VAL-CLI-039-clone_info_echo.txt"
+        ],
+        "network": "n/a",
+        "consoleErrors": "n/a"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-040",
+      "title": "Unparseable git URI prints error",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `lab clone not-a-valid-uri`",
+          "expected": "non-zero exit and parse error on stderr",
+          "observed": "exit code 1 and stderr `Error: Unable to parse git URI: not-a-valid-uri`"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "cli-foundation/cli-env-tail/VAL-CLI-040-unparseable_git_uri.txt"
+        ],
+        "network": "n/a",
+        "consoleErrors": "n/a"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-041",
+      "title": "Install with read-only RC file warns",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Create temp HOME/.zshrc, set mode 0444, run `lab install` with SHELL=/bin/zsh",
+          "expected": "warning on stderr and exit 1",
+          "observed": "stderr warned `.zshrc is read-only, skipping.` and command exited 1"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "cli-foundation/cli-env-tail/VAL-CLI-041-install_readonly_rc.txt"
+        ],
+        "network": "n/a",
+        "consoleErrors": "n/a"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 8 assertions: 7 passed, 1 failed (VAL-CLI-038)."
+}

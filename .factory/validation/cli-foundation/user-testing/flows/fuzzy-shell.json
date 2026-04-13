@@ -1,0 +1,176 @@
+{
+  "groupId": "fuzzy-shell",
+  "surface": "shell-command",
+  "testedAt": "2026-04-13T07:06:09.411195+00:00",
+  "isolation": {
+    "tempRoot": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/fuzzy-shell-w8qjoc0g",
+    "binary": "/Users/js/code/rust/lab/target/debug/lab",
+    "labPaths": {
+      "VAL-FUZZY-001/002/003": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/fuzzy-shell-w8qjoc0g/labs-001",
+      "VAL-FUZZY-010": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/fuzzy-shell-w8qjoc0g/labs-010",
+      "VAL-FUZZY-011": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/fuzzy-shell-w8qjoc0g/labs-011",
+      "VAL-FUZZY-013": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/fuzzy-shell-w8qjoc0g/labs-013"
+    },
+    "craftedMtimeStrategy": "Per-assertion directories with explicit os.utime offsets to force deterministic recency scoring"
+  },
+  "toolsUsed": [
+    "shell-command"
+  ],
+  "assertionResults": [
+    {
+      "id": "VAL-FUZZY-001",
+      "title": "Case-insensitive matching",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run with `--and-type=BETA` and `--and-type=AlPhA`",
+          "expected": "BETA matches 2025-11-15-beta and AlPhA matches alpha",
+          "observed": "beta_match=True, alpha_match=True"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/fuzzy-shell/VAL-FUZZY-001.txt"
+        ],
+        "commands": [
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/fuzzy-shell-w8qjoc0g/labs-001 --and-type=BETA --and-exit exec",
+            "exitCode": 1
+          },
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/fuzzy-shell-w8qjoc0g/labs-001 --and-type=AlPhA --and-exit exec",
+            "exitCode": 1
+          }
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FUZZY-002",
+      "title": "Partial subsequence matching",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run with `--and-type=gam`",
+          "expected": "2025-11-20-gamma is present in filtered results",
+          "observed": "gamma_present=True"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/fuzzy-shell/VAL-FUZZY-002.txt"
+        ],
+        "commands": [
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/fuzzy-shell-w8qjoc0g/labs-001 --and-type=gam --and-exit exec",
+            "exitCode": 1
+          }
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FUZZY-003",
+      "title": "Non-matching query filters all entries",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run with `--and-type=xyznotfound`",
+          "expected": "Only create-new row with 📂 appears; no existing dirs are listed",
+          "observed": "has_new=True, has_existing_names=False"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/fuzzy-shell/VAL-FUZZY-003.txt"
+        ],
+        "commands": [
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/fuzzy-shell-w8qjoc0g/labs-001 --and-type=xyznotfound --and-exit exec",
+            "exitCode": 1
+          }
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FUZZY-010",
+      "title": "Recency bonus from mtime",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run with no query on two date-prefixed dirs with different mtimes",
+          "expected": "Recently touched dir appears above old dir",
+          "observed": "entries=['2025-10-01-recent', '2025-10-01-old']"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/fuzzy-shell/VAL-FUZZY-010.txt"
+        ],
+        "commands": [
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/fuzzy-shell-w8qjoc0g/labs-010 --and-exit exec",
+            "exitCode": 1
+          }
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FUZZY-011",
+      "title": "Empty query returns all entries sorted by base_score",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run with empty query across 4 crafted dirs (mixed date-prefix and mtimes)",
+          "expected": "All dirs listed and sorted by base_score descending",
+          "observed": "entries=['2025-11-20-gamma', '2025-11-15-beta', 'zeta', 'alpha']"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/fuzzy-shell/VAL-FUZZY-011.txt"
+        ],
+        "commands": [
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/fuzzy-shell-w8qjoc0g/labs-011 --and-exit exec",
+            "exitCode": 1
+          }
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FUZZY-013",
+      "title": "Result count limited to visible area",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run with LAB_HEIGHT=8 and 7 candidate dirs",
+          "expected": "Displayed rows capped at 3",
+          "observed": "visible_entries=3, entries=['2025-11-01-item1', '2025-11-02-item2', '2025-11-03-item3']"
+        }
+      ],
+      "evidence": {
+        "files": [
+          "cli-foundation/fuzzy-shell/VAL-FUZZY-013.txt"
+        ],
+        "commands": [
+          {
+            "command": "/Users/js/code/rust/lab/target/debug/lab --path /var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/fuzzy-shell-w8qjoc0g/labs-013 --and-exit exec",
+            "exitCode": 1,
+            "env": {
+              "LAB_HEIGHT": "8",
+              "LAB_WIDTH": "100"
+            }
+          }
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 6 assertions: 6 passed, 0 failed, 0 blocked."
+}
