@@ -142,9 +142,9 @@ fn interactive_loop(terminal: &mut TuiTerminal, app: &mut App) -> io::Result<Tui
                 }
             }
             Event::Resize(width, height) => {
-                let size = TerminalSize::new(width, height);
+                let size = TerminalSize::from_detected(width, height);
                 app.set_terminal_size(size);
-                terminal.resize(Rect::new(0, 0, width.max(1), height.max(1)))?;
+                terminal.resize(Rect::new(0, 0, size.width, size.height))?;
             }
             _ => {}
         }

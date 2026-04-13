@@ -37,9 +37,15 @@ impl TerminalSize {
     /// Detect terminal size, honoring LAB_WIDTH/LAB_HEIGHT overrides.
     pub fn detect() -> Self {
         let (detected_width, detected_height) = terminal::size().unwrap_or((80, 24));
+        Self::from_detected(detected_width, detected_height)
+    }
+
+    /// Build a terminal size from detected dimensions while honoring
+    /// LAB_WIDTH/LAB_HEIGHT overrides.
+    pub fn from_detected(width: u16, height: u16) -> Self {
         Self::new(
-            resolve_dimension(env::var("LAB_WIDTH").ok().as_deref(), detected_width, 80),
-            resolve_dimension(env::var("LAB_HEIGHT").ok().as_deref(), detected_height, 24),
+            resolve_dimension(env::var("LAB_WIDTH").ok().as_deref(), width, 80),
+            resolve_dimension(env::var("LAB_HEIGHT").ok().as_deref(), height, 24),
         )
     }
 }
@@ -353,7 +359,7 @@ fn resolve_dimension(override_value: Option<&str>, detected: u16, default: u16) 
     override_value
         .and_then(|value| value.parse::<u16>().ok())
         .filter(|value| *value > 0)
-        .unwrap_or_else(|| detected.max(default))
+        .unwrap_or(if detected > 0 { detected } else { default })
 }
 
 #[cfg(test)]
@@ -565,6 +571,18 @@ mod tests {
         assert_eq!(resolve_dimension(Some("120"), 80, 24), 120);
         assert_eq!(resolve_dimension(Some("0"), 80, 24), 80);
         assert_eq!(resolve_dimension(Some("not-a-number"), 80, 24), 80);
+    }
+
+    #[test]
+    fn test_resolve_dimension_keeps_detected_size_when_narrower_than_default() {
+        assert_eq!(resolve_dimension(None, 40, 80), 40);
+        assert_eq!(resolve_dimension(None, 10, 24), 10);
+    }
+
+    #[test]
+    fn test_resolve_dimension_falls_back_to_default_when_detection_is_zero() {
+        assert_eq!(resolve_dimension(None, 0, 80), 80);
+        assert_eq!(resolve_dimension(None, 0, 24), 24);
     }
 
     #[test]

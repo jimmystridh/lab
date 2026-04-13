@@ -47,9 +47,7 @@ pub fn has_date_prefix(name: &str) -> bool {
 
 /// Compute the recency bonus: 3.0 / sqrt(hours_since_mtime + 1).
 fn recency_bonus(mtime: SystemTime) -> f64 {
-    let elapsed = SystemTime::now()
-        .duration_since(mtime)
-        .unwrap_or_default();
+    let elapsed = SystemTime::now().duration_since(mtime).unwrap_or_default();
     let hours = elapsed.as_secs_f64() / 3600.0;
     3.0 / (hours + 1.0).sqrt()
 }
@@ -106,6 +104,12 @@ pub fn load_entries(base_path: &Path) -> Vec<Entry> {
             continue;
         }
 
+        // Skip unreadable directories silently so permission-denied entries do
+        // not appear in the selector.
+        if fs::read_dir(&entry_path).is_err() {
+            continue;
+        }
+
         let mtime = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
 
         // For symlinks, resolve to realpath; for regular dirs, use the path as-is
@@ -133,7 +137,7 @@ pub fn load_entries(base_path: &Path) -> Vec<Entry> {
 mod tests {
     use super::*;
     use std::fs;
-    use std::os::unix::fs as unix_fs;
+    use std::os::unix::fs::{self as unix_fs, PermissionsExt};
     use std::time::{Duration, SystemTime};
 
     /// Create a temporary test directory with some subdirectories.
@@ -194,7 +198,10 @@ mod tests {
         let entries = load_entries(tmp.path());
 
         let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
-        assert!(!names.contains(&"file.txt"), "should not contain regular files");
+        assert!(
+            !names.contains(&"file.txt"),
+            "should not contain regular files"
+        );
     }
 
     #[test]
@@ -212,7 +219,10 @@ mod tests {
         assert!(entry.is_symlink, "should be marked as symlink");
         // Resolved path should be the real path of alpha
         let expected_real = fs::canonicalize(tmp.path().join("alpha")).unwrap();
-        assert_eq!(entry.path, expected_real, "symlink should resolve to realpath");
+        assert_eq!(
+            entry.path, expected_real,
+            "symlink should resolve to realpath"
+        );
     }
 
     #[test]
@@ -224,7 +234,10 @@ mod tests {
 
         let entries = load_entries(tmp.path());
         let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
-        assert!(!names.contains(&"file-link"), "symlinks to files should be excluded");
+        assert!(
+            !names.contains(&"file-link"),
+            "symlinks to files should be excluded"
+        );
     }
 
     #[test]
@@ -348,5 +361,36 @@ mod tests {
         let entries = load_entries(tmp.path());
         let alpha = entries.iter().find(|e| e.name == "alpha").unwrap();
         assert_eq!(alpha.path, tmp.path().join("alpha"));
+    }
+
+    #[test]
+    fn test_load_entries_skips_unreadable_directories() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let readable = tmp.path().join("readable");
+        let unreadable = tmp.path().join("unreadable");
+        fs::create_dir(&readable).expect("readable dir");
+        fs::create_dir(&unreadable).expect("unreadable dir");
+
+        let mut restricted = fs::metadata(&unreadable).expect("metadata").permissions();
+        restricted.set_mode(0o000);
+        fs::set_permissions(&unreadable, restricted).expect("chmod 000");
+
+        let entries = load_entries(tmp.path());
+        let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
+
+        let mut restored = fs::metadata(&unreadable)
+            .expect("restore metadata")
+            .permissions();
+        restored.set_mode(0o755);
+        fs::set_permissions(&unreadable, restored).expect("restore permissions");
+
+        assert!(
+            names.contains(&"readable"),
+            "readable dir should remain visible"
+        );
+        assert!(
+            !names.contains(&"unreadable"),
+            "unreadable directories should be skipped"
+        );
     }
 }

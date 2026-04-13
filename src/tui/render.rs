@@ -17,6 +17,8 @@ use std::{sync::atomic::Ordering, time::SystemTime};
 const TITLE: &str = " Lab Directory Selection";
 const FOOTER_HINTS: &str =
     "↑/↓: Navigate  Enter: Select  ^R: Rename  ^G: Graduate  ^D: Delete  Esc: Cancel";
+const CURSOR_HOME: &str = "\x1b[H";
+const CLEAR_TO_END_SCREEN: &str = "\x1b[J";
 
 /// Render a single frame for the current app state.
 pub fn render(frame: &mut Frame<'_>, app: &App) {
@@ -232,7 +234,10 @@ fn render_snapshot_with_colors(app: &App, width: u16, height: u16, colors_enable
     if rendered.is_empty() {
         String::new()
     } else {
-        format!("\x1b[H{}\n", rendered.join("\n"))
+        format!(
+            "{CURSOR_HOME}{CLEAR_TO_END_SCREEN}{}\n",
+            rendered.join("\n")
+        )
     }
 }
 
@@ -912,6 +917,56 @@ mod tests {
 
         assert!(line.contains("…"));
         assert!(!line.contains("3.0"));
+    }
+
+    #[test]
+    fn test_truncated_selected_line_keeps_background_on_ellipsis() {
+        let name = "2025-11-29-extremely-long-project-name-that-needs-truncation";
+        let mut app = make_app(
+            vec![make_entry(name, false, SystemTime::now())],
+            24,
+            8,
+            None,
+        );
+        app.filtered = vec![MatchResult {
+            index: 0,
+            score: 3.0,
+            positions: Vec::new(),
+        }];
+
+        let rendered = snapshot(&app, true);
+        let line = rendered.lines().nth(3).expect("entry line");
+
+        let bg_start = line
+            .rfind("\x1b[48;5;238m")
+            .expect("selected background segment");
+
+        assert!(line[bg_start..].contains("…"));
+    }
+
+    #[test]
+    fn test_render_snapshot_without_colors_omits_sgr_but_keeps_cursor_control() {
+        let mut app = make_app(
+            vec![make_entry("2025-11-29-project", false, SystemTime::now())],
+            60,
+            8,
+            None,
+        );
+        app.filtered = vec![MatchResult {
+            index: 0,
+            score: 5.0,
+            positions: Vec::new(),
+        }];
+
+        let rendered = snapshot(&app, false);
+
+        assert!(rendered.starts_with("\x1b[H\x1b[J"));
+        assert!(!rendered.contains("\x1b[0m"));
+        assert!(!rendered.contains("\x1b[1m"));
+        assert!(!rendered.contains("\x1b[7m"));
+        assert!(!rendered.contains("\x1b[33m"));
+        assert!(!rendered.contains("\x1b[38;5;"));
+        assert!(!rendered.contains("\x1b[48;5;"));
     }
 
     #[test]
