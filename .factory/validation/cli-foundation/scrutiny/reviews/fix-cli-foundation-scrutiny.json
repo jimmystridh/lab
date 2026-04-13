@@ -1,0 +1,28 @@
+{
+  "featureId": "fix-cli-foundation-scrutiny",
+  "reviewedAt": "2026-04-13T06:23:24Z",
+  "commitId": "55c39bced463ae355f4fad11b0bfb8515b0bcd9e",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The fix commit resolves the prior blocking findings for project-setup, cli-parsing-help, clone-command, and worktree-dot-shorthand, and the fuzzy-scoring behavior remains aligned with the mission contract formula. However, shell-init-install is still not fixed: `lab init` still uses a SHELL-only heuristic and does not use parent-process fallback when SHELL is unset.",
+    "issues": [
+      {
+        "file": "src/commands/init.rs",
+        "line": 47,
+        "severity": "blocking",
+        "description": "The shell-detection fix was applied in `src/shell.rs`, but `cmd_init` still calls local `detect_shell_for_init()` (`src/commands/init.rs:37`) which only checks `SHELL` for fish and otherwise defaults to Bash. This bypasses the required parent-process fallback behavior from the prior failure (`shell-init-install.json`) when `SHELL` is unset."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Shell detection logic is split between `src/shell.rs` and `src/commands/init.rs`, but shared docs describe shell detection as a shell module concern. This duplication made it easy to patch the wrong path and leave init behavior unchanged.",
+      "evidence": ".factory/library/architecture.md says `src/shell.rs` owns shell detection, while `src/commands/init.rs:37-55` contains separate init-only detection logic not documented in AGENTS.md."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/cli-foundation/scrutiny/reviews/{project-setup,cli-parsing-help,scoring-fuzzy-matching,shell-init-install,clone-command,worktree-dot-shorthand}.json",
+  "summary": "Fail: 5/6 prior blocking areas are addressed, but the shell init fallback issue remains blocking because `lab init` still does not use parent-process shell detection when `SHELL` is unset."
+}
