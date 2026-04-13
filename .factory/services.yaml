@@ -1,0 +1,9 @@
+commands:
+  build: cargo build
+  test: cargo test
+  lint: cargo clippy -- -D warnings
+  typecheck: cargo check
+  run: cargo run --
+  spec-test: bash spec/tests/runner.sh ./target/debug/lab
+
+services: {}
