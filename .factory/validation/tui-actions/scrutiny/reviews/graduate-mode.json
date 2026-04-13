@@ -1,0 +1,40 @@
+{
+  "featureId": "graduate-mode",
+  "reviewedAt": "2026-04-13T11:25:00.000Z",
+  "commitId": "471e01d77bcc225b8aca05d368f271a2e77a8011",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Solid implementation of the graduate dialog across all layers (dialogs, app state, input handling, rendering, script generation, command dispatch). The code follows existing patterns established by the rename and delete dialog features. All 14 expectedBehavior items are covered. The Ruby reference behavior is faithfully reproduced with appropriate try→lab renaming. The spec test portability fix (grep -P → sed -nE) is correct and macOS-compatible. 328 unit tests pass, 25 spec assertions pass, clippy clean.",
+    "issues": [
+      {
+        "file": "src/tui/render.rs",
+        "line": 520,
+        "severity": "non_blocking",
+        "description": "Minor UI divergence from Ruby reference: the destination hint line is always rendered, whereas the Ruby version conditionally hides it when base_path == projects_dir. In practice this condition is rarely true (labs path would need no parent), so the difference is negligible."
+      },
+      {
+        "file": "src/tui/render.rs",
+        "line": 527,
+        "severity": "non_blocking",
+        "description": "When a validation error is shown, the layout differs slightly from Ruby: Rust shows [symlink_msg, error] while Ruby shows [blank, symlink_msg, blank, error]. The Rust version adapts this for the fixed-height body constraint of ratatui, which is a reasonable trade-off."
+      },
+      {
+        "file": "src/tui/app.rs",
+        "line": 903,
+        "severity": "non_blocking",
+        "description": "expand_input_path does not resolve '..' or '.' components (unlike Ruby's File.expand_path). Paths like '/tmp/foo/../bar' would be passed through to mv/git-worktree-move verbatim. These commands handle such paths correctly, so this is not a functional issue, but it produces slightly different error messages for edge cases involving '..' in paths."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "The GraduateDialog struct duplicates all line-editing methods (insert_char, backspace, move_to_start/end, move_back/forward, kill_to_end, delete_word_backward) that also exist in RenameDialog and DeleteConfirmation. This is the established pattern in the codebase — three dialog types with identical editing logic. If more dialog types are added in the future, extracting a shared LineEditor trait or struct would reduce duplication. Not a convention violation since the pattern is already established, but worth noting for future features.",
+      "evidence": "src/tui/dialogs.rs — GraduateDialog methods at lines 239-296 are identical in logic to RenameDialog methods at lines 123-185 and DeleteConfirmation methods at lines 29-85."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Graduate mode implementation passes review. All expected behaviors are implemented: Ctrl-G opens dialog with 🚀 emoji, date prefix stripping, LAB_PROJECTS override, editable pre-filled destination, three validation checks (empty/exists/missing-parent), worktree-aware move vs mv, symlink creation, graduation message, cd to destination, ESC/Ctrl-C cancel, and full readline-style editing. The spec test portability fix correctly replaces grep -P with sed -nE. Three non-blocking UI differences from the Ruby reference were noted but none affect correctness. Code quality is high with comprehensive test coverage across all layers."
+}

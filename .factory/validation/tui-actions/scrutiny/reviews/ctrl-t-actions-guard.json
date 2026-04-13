@@ -1,0 +1,33 @@
+{
+  "featureId": "ctrl-t-actions-guard",
+  "reviewedAt": "2026-04-13T13:50:00.000Z",
+  "commitId": "95db1b898f0df251366bd8c763081b47c358c301",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Clean, well-tested implementation of all four feature requirements. Ctrl-T correctly routes through the new TuiOutcome::Mkdir variant to always emit plain mkdir+cd scripts (bypassing git-worktree logic). Action guards on Ctrl-R/G/D leverage the existing current_entry_index() → None guard in begin_rename/begin_graduate/toggle_delete_mark, which is the idiomatic pattern already established in the codebase. The shared dispatch_cd_args function unifies URL-shorthand clone routing for both top-level cd and exec cd paths, eliminating prior duplication. Two necessary side-fixes (ESC cancel spec test alignment and worktree single-arg resolution) were required for the full 379/379 runner pass that the feature's verificationSteps demanded.",
+    "issues": [
+      {
+        "file": "src/tui/input.rs",
+        "line": 226,
+        "severity": "non_blocking",
+        "description": "Ctrl-T handler calls create_new_name() which consumes the current input state to build the name, but doesn't clear the input or exit the TUI on its own — that's handled by the returned TuiOutcome::Mkdir flowing up through the event loop. This is correct but worth noting: if create_new_name() ever gained side-effects, the double-call pattern (once to build the path, once implicitly in the map closure) would be fragile. Currently safe because create_new_name() is a pure read."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "The new dispatch_cd_args() function in main.rs introduces a shared routing layer between the top-level cd command and exec cd that didn't exist before. The architecture.md Data Flow section describes CLI dispatch as 'Parse args via clap → match command → invoke handler' but doesn't mention this intermediate shared dispatcher. As more routing functions accumulate in main.rs, this pattern should be documented.",
+      "evidence": "src/main.rs:81-99 — dispatch_cd_args() is called from both the NormalizedCommand::Cd arm (line 222) and dispatch_exec's cd sub-dispatch (line 142) and default fallthrough (line 157)."
+    },
+    {
+      "area": "skills",
+      "observation": "Worker deviated from procedure by fixing two pre-existing blockers (ESC cancel spec test and worktree single-arg resolution) outside feature scope. The deviation was justified: the feature's verificationSteps explicitly require a full runner pass. The skill's procedure (step 7) says 'Use the full runner only when the feature explicitly calls for it' but doesn't clarify whether fixing pre-existing blockers is in-scope when the full runner is required. The worker's suggestedChanges field proposes exactly this clarification.",
+      "evidence": "Handoff skillFeedback.deviations[0]: 'I fixed two validator blockers outside the narrow feature scope: a stale ESC-cancel shell expectation and the single-argument worktree cwd/name interpretation'. Feature verificationSteps includes 'bash spec/tests/runner.sh ./target/debug/lab — aim for full green'."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "All four feature requirements are correctly implemented with comprehensive test coverage (unit tests for Ctrl-T mkdir outcome, create-new action guards for D/R/G, shared cd URL-shorthand dispatch, and matching spec tests). The implementation introduces a clean TuiOutcome::Mkdir variant that bypasses git-worktree logic, uses the existing current_entry_index() guard pattern for action blocking, and consolidates URL-shorthand routing via a shared dispatch_cd_args function. No blocking issues found. Two necessary side-fixes for the full runner pass are well-justified."
+}

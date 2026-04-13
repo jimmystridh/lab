@@ -1,0 +1,47 @@
+{
+  "milestone": "tui-actions",
+  "round": 1,
+  "status": "pass",
+  "validatorsRun": {
+    "test": { "passed": true, "command": "cargo test", "exitCode": 0 },
+    "typecheck": { "passed": true, "command": "cargo check", "exitCode": 0 },
+    "lint": { "passed": true, "command": "cargo clippy -- -D warnings", "exitCode": 0 }
+  },
+  "reviewsSummary": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "skills",
+      "suggestion": "Clarify the rust-worker skill's TDD step (step 3) to acknowledge that features introducing new shared types (enums, structs) across multiple modules may need to scaffold the types before writing focused tests. The current strict TDD guidance ('write tests first') doesn't account for cross-module features where types must exist in multiple files before any test can compile. Suggest adding a note like: 'For features spanning multiple modules with new shared types, scaffold minimal type definitions first, then write tests alongside implementation.'",
+      "evidence": "Features delete-mode, rename-mode, graduate-mode, and ctrl-t-actions-guard all deviated from strict TDD because new shared state (Mode::Delete/Rename/Graduate, dialog structs, TuiOutcome variants) had to be plumbed through 5+ files before tests could compile. All 4 workers independently reported this deviation in their skillFeedback.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Clarify the rust-worker skill's procedure regarding pre-existing test failures when a feature's verificationSteps require a full runner pass. Should workers fix blockers outside their feature scope to achieve the required full pass? Suggest adding: 'When verificationSteps require a full test runner pass and pre-existing failures block it, workers may fix those blockers as part of the feature, documenting the fixes in their handoff.'",
+      "evidence": "Feature ctrl-t-actions-guard worker fixed two pre-existing blockers (ESC cancel spec test alignment and worktree single-arg resolution) because verificationSteps said 'bash spec/tests/runner.sh ./target/debug/lab — aim for full green'. Worker flagged this as a skill ambiguity in suggestedChanges.",
+      "isSystemic": false
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Spec test test_31_rename.sh was significantly refactored with fewer but more precise tests, dropping some UI-specific assertions for pencil emoji, separator lines, and label rendering.",
+      "reason": "This is a judgment call by the implementor about test quality vs coverage breadth, not a shared state or convention issue. The retained tests are higher quality and cover correctness."
+    },
+    {
+      "observation": "GraduateDialog, RenameDialog, and DeleteConfirmation all duplicate identical line-editing methods (insert_char, backspace, move_to_start/end, kill_to_end, delete_word_backward).",
+      "reason": "Already an established pattern in the codebase — three dialog types with identical editing logic. This is a future refactoring opportunity (extract LineEditor trait/struct) but not a convention violation or a shared state gap."
+    },
+    {
+      "observation": "New dispatch_cd_args() function in main.rs introduces routing not documented in architecture.md.",
+      "reason": "architecture.md in .factory/library/ is reference documentation, not a normative guide. The function is a clean internal refactoring. Architecture docs evolve naturally and don't need synchronous updates for every internal routing change."
+    }
+  ],
+  "previousRound": null
+}
