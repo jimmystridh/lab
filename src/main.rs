@@ -8,9 +8,11 @@ mod commands;
 mod entries;
 mod fuzzy;
 mod git;
+#[allow(dead_code)]
 mod script;
 mod shell;
 mod tui;
+#[allow(dead_code)]
 mod util;
 
 use std::env;
