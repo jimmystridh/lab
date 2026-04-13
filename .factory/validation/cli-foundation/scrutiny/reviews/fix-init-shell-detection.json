@@ -1,0 +1,28 @@
+{
+  "featureId": "fix-init-shell-detection",
+  "reviewedAt": "2026-04-13T06:34:04Z",
+  "commitId": "a5cb962",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The fix commit correctly addresses the original blocking bug by removing init.rs-local shell detection and wiring cmd_init to the shared shell::detect_shell() path (which includes parent-process fallback). However, the new regression test intended to verify SHELL-unset fallback is ineffective and cannot fail, so the requested regression protection is not actually implemented.",
+    "issues": [
+      {
+        "file": "src/commands/init.rs",
+        "line": 131,
+        "severity": "blocking",
+        "description": "The regression test `test_detect_shell_works_without_shell_env` uses a tautological assertion (`result.is_some() || result.is_none()`), which always passes and does not verify parent-process fallback behavior when SHELL is unset. This leaves the feature requirement ('add regression test verifying fallback') unmet."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The rust-worker skill prescribes TDD (write failing tests first), but this fix session implemented code changes before adding/updating tests while still reporting `skillFeedback.followedProcedure: true`; procedure compliance criteria appear unclear in shared practice.",
+      "evidence": "SKILL.md step 3 requires red-first TDD. Transcript skeleton for session abedec3d-75c0-4655-a045-9adcea666bfb shows Edit on src/commands/init.rs implementation before the later test-edit step, then reports followedProcedure=true in handoff."
+    }
+  ],
+  "addressesFailureFrom": ".factory/validation/cli-foundation/scrutiny/reviews/fix-cli-foundation-scrutiny.json",
+  "summary": "Fail: the original shell-detection wiring issue from fix-cli-foundation-scrutiny is fixed in code, but the added regression test is non-assertive and does not validate the SHELL-unset parent-process fallback requirement."
+}

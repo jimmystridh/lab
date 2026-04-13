@@ -209,6 +209,12 @@ fn resolve_dot_path(dot_arg: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn cwd_test_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn test_basename_from_path_simple() {
@@ -260,6 +266,7 @@ mod tests {
 
     #[test]
     fn test_resolve_dot_path_bare_dot() {
+        let _guard = cwd_test_lock().lock().unwrap();
         let result = resolve_dot_path(".");
         let cwd = env::current_dir().unwrap();
         assert_eq!(result, cwd.to_string_lossy().to_string());
@@ -290,6 +297,7 @@ mod tests {
 
     #[test]
     fn test_cmd_dot_non_git_uses_mkdir() {
+        let _guard = cwd_test_lock().lock().unwrap();
         // When invoked from a non-git directory, dot should use mkdir
         let labs_dir = tempfile::tempdir().unwrap();
         let non_git_dir = tempfile::tempdir().unwrap();

@@ -1,6 +1,6 @@
 {
   "milestone": "cli-foundation",
-  "round": 3,
+  "round": 2,
   "status": "fail",
   "validatorsRun": {
     "test": {
@@ -24,25 +24,25 @@
     "passed": 0,
     "failed": 1,
     "failedFeatures": [
-      "fix-init-shell-detection"
+      "fix-cli-foundation-scrutiny"
     ]
   },
   "blockingIssues": [
     {
-      "featureId": "fix-init-shell-detection",
+      "featureId": "fix-cli-foundation-scrutiny",
       "severity": "blocking",
-      "description": "The regression test in src/commands/init.rs is tautological (`result.is_some() || result.is_none()`), so it does not verify SHELL-unset parent-process fallback behavior and leaves required regression coverage unmet."
+      "description": "src/commands/init.rs still uses local detect_shell_for_init() in cmd_init; this bypasses parent-process fallback in src/shell.rs and leaves shell-init-install fix incomplete when SHELL is unset."
     }
   ],
   "appliedUpdates": [],
   "suggestedGuidanceUpdates": [
     {
       "target": ".factory/skills/rust-worker/SKILL.md",
-      "suggestion": "Clarify TDD/procedure compliance reporting: if implementation edits are done before a failing test is added, require followedProcedure=false (or an explicit justified deviation) rather than reporting full adherence.",
-      "evidence": "Review of fix-init-shell-detection found implementation edits were made before test updates, but handoff reported followedProcedure=true; this makes skill compliance signals unreliable.",
+      "suggestion": "When patching behavior owned by a shared module (e.g., shell detection), require a quick call-site audit to ensure command-level wrappers are not bypassing the updated module function.",
+      "evidence": "Round-2 fix updated src/shell.rs but cmd_init continued to call a separate init-local detector in src/commands/init.rs, leaving the original shell fallback issue unresolved.",
       "isSystemic": false
     }
   ],
   "rejectedObservations": [],
-  "previousRound": ".factory/validation/cli-foundation/scrutiny/synthesis.round2.json"
+  "previousRound": ".factory/validation/cli-foundation/scrutiny/synthesis.round1.json"
 }
