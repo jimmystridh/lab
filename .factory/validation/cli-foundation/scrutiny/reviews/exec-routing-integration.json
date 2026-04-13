@@ -1,0 +1,21 @@
+{
+  "featureId": "exec-routing-integration",
+  "reviewedAt": "2026-04-13T05:26:17Z",
+  "commitId": "eee025d",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Reviewed handoff, transcript skeleton, and commit eee025d. The implementation wires exec/default routing through `dispatch_exec`, correctly dispatches `exec clone`, `exec worktree`, and `exec cd`, preserves URL shorthand to clone for both `exec <url>` and `exec cd <url>`, and routes unknown/no-subcommand exec paths to the cd selector stub. The cd path loads entries, supports deterministic `--and-keys`/`--and-exit` behavior, and emits shell scripts through existing script builders; no actionable correctness or regression issues were identified against this feature’s requirements.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Shared guidance appears stale relative to the implementation pattern used by this and prior features: docs prescribe clap/ratatui-driven flows while current code uses manual CLI parsing and command-local injected key handling.",
+      "evidence": "AGENTS.md:14-15 says to use `clap` derive macros and ratatui/crossterm TUI flow; architecture.md:16,43,51,93 documents clap parsing and `src/tui/test_keys.rs` injection path. Current implementation uses manual parsing in src/cli.rs:152-158 and in-feature key parsing/handling in src/commands/cd.rs:191 and 519-641."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Pass. Exec routing integration is correctly implemented for clone/worktree/cd/default and URL shorthand, with no actionable defects found for this feature scope."
+}

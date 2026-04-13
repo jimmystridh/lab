@@ -1,0 +1,122 @@
+{
+  "milestone": "cli-foundation",
+  "round": 1,
+  "status": "fail",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "cargo test --manifest-path \"/Users/js/code/rust/lab/Cargo.toml\"",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "cargo check --manifest-path \"/Users/js/code/rust/lab/Cargo.toml\"",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "cargo clippy --manifest-path \"/Users/js/code/rust/lab/Cargo.toml\" -- -D warnings",
+      "exitCode": 0
+    }
+  },
+  "reviewsSummary": {
+    "total": 8,
+    "passed": 2,
+    "failed": 6,
+    "failedFeatures": [
+      "project-setup",
+      "cli-parsing-help",
+      "scoring-fuzzy-matching",
+      "shell-init-install",
+      "clone-command",
+      "worktree-dot-shorthand"
+    ]
+  },
+  "blockingIssues": [
+    {
+      "featureId": "project-setup",
+      "severity": "blocking",
+      "description": "spec/command_line.md:6 still uses `try` naming; try→lab adaptation is incomplete."
+    },
+    {
+      "featureId": "project-setup",
+      "severity": "blocking",
+      "description": "spec/init_spec.md:25 still uses `try()` and `/path/to/try` examples; adaptation is incomplete."
+    },
+    {
+      "featureId": "project-setup",
+      "severity": "blocking",
+      "description": "spec/test_spec.md:39 still references `./try`; copied spec documentation was not fully adapted."
+    },
+    {
+      "featureId": "cli-parsing-help",
+      "severity": "blocking",
+      "description": "src/cli.rs does not use clap derive macros as required by feature scope/conventions."
+    },
+    {
+      "featureId": "cli-parsing-help",
+      "severity": "blocking",
+      "description": "src/cli.rs command parsing omits required top-level `cd` command."
+    },
+    {
+      "featureId": "scoring-fuzzy-matching",
+      "severity": "blocking",
+      "description": "src/fuzzy.rs applies density/length multipliers only to fuzzy_component, diverging from Ruby reference algorithm that multiplies total running score."
+    },
+    {
+      "featureId": "shell-init-install",
+      "severity": "blocking",
+      "description": "src/commands/init.rs shell detection does not fall back to parent process name when SHELL is unset, causing wrong snippet emission in fish scenarios."
+    },
+    {
+      "featureId": "clone-command",
+      "severity": "blocking",
+      "description": "src/commands/clone.rs accepts unparseable URIs when custom_name is provided; unparseable URIs must error and exit 1."
+    },
+    {
+      "featureId": "worktree-dot-shorthand",
+      "severity": "blocking",
+      "description": "src/commands/worktree.rs always emits script_worktree; non-git worktree invocations must emit mkdir-only script (no `worktree add` text)."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": ".factory/skills/rust-worker/SKILL.md",
+      "suggestion": "Add an explicit precedence rule: when Ruby reference behavior conflicts with validation-contract assertions, implement to validation-contract first and call out the divergence in handoff.",
+      "evidence": "Both clone-command and worktree-dot-shorthand reviews found decision churn tied to Ruby-parity guidance conflicting with contract assertions.",
+      "isSystemic": true
+    },
+    {
+      "target": ".factory/skills/rust-worker/SKILL.md",
+      "suggestion": "Make TDD/spec-run steps conditional for setup/scaffolding features where acceptance criteria explicitly state copied tests are expected to fail initially, and require explicit 'skipped by contract' reporting in verification.",
+      "evidence": "project-setup review observed scaffolding scope conflicting with rigid TDD/spec-test procedure; scoring-fuzzy-matching review flagged inconsistent procedure reporting.",
+      "isSystemic": true
+    },
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Add a verification checklist note for bulk renames/copies: include both `spec/tests/*` and top-level `spec/*.md` files to avoid partial try→lab rename drift.",
+      "evidence": "project-setup passed local checks focused on spec/tests while top-level spec markdown files retained `try` references.",
+      "isSystemic": false
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Shared guidance is stale because implementation now uses manual parsing and command-local key handling.",
+      "reason": "rejected-as-wrong: this milestone contract and AGENTS conventions require clap-based parsing; observation reflected implementation drift, not guidance error."
+    },
+    {
+      "observation": "clap derive convention mismatch should be documented as allowed exception.",
+      "reason": "rejected-as-wrong: reviewers confirmed clap derive omission is a blocking defect for this milestone, not an approved exception."
+    },
+    {
+      "observation": "Missing spec-test command in one worker handoff indicates skill mismatch.",
+      "reason": "rejected-as-duplicate: covered by the broader rust-worker procedure update recommendation on conditional spec runs and explicit skip reporting."
+    },
+    {
+      "observation": "Validation contract and shell spec test mismatch for non-git worktree behavior.",
+      "reason": "rejected-as-ambiguous-for-direct-application: requires orchestrator decision on whether to update contract, spec tests, or both."
+    }
+  ],
+  "previousRound": null
+}

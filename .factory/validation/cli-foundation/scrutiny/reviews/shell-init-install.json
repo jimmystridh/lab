@@ -1,0 +1,22 @@
+{
+  "featureId": "shell-init-install",
+  "reviewedAt": "2026-04-13T05:26:09Z",
+  "commitId": "812d91a",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "Most shell init/install behavior matches the contract, but init shell detection misses a required fallback path from the Ruby reference implementation.",
+    "issues": [
+      {
+        "file": "src/commands/init.rs",
+        "line": 47,
+        "severity": "blocking",
+        "description": "`cmd_init` relies on `detect_shell_for_init()`, which only checks `$SHELL` for fish and otherwise defaults to Bash. In the reference behavior (`/Users/js/code/3rd/try/try.rb`, `fish?` at lines 1505-1509), init shell detection falls back to the parent process name when `$SHELL` is empty. This causes `lab init` to emit a bash snippet instead of fish when run from fish with `SHELL` unset."
+      }
+    ]
+  },
+  "sharedStateObservations": [],
+  "addressesFailureFrom": null,
+  "summary": "Fail: one blocking correctness issue found in `lab init` shell detection fallback behavior."
+}

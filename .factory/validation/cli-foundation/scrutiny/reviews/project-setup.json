@@ -1,0 +1,45 @@
+{
+  "featureId": "project-setup",
+  "reviewedAt": "2026-04-13T05:24:33Z",
+  "commitId": "0a8f758",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "Project scaffolding and spec/tests adaptation were mostly completed, but copied spec markdown files were not fully renamed from try to lab, which violates the explicit adaptation requirement.",
+    "issues": [
+      {
+        "file": "spec/command_line.md",
+        "line": 6,
+        "severity": "blocking",
+        "description": "Copied spec content still uses `try` command naming (`try [options] ...`) instead of `lab`, despite the requirement to adapt try→lab references."
+      },
+      {
+        "file": "spec/init_spec.md",
+        "line": 25,
+        "severity": "blocking",
+        "description": "Shell init examples still define `try()` and reference `/path/to/try`; these should be adapted to `lab()` and lab naming."
+      },
+      {
+        "file": "spec/test_spec.md",
+        "line": 39,
+        "severity": "blocking",
+        "description": "Test infrastructure documentation still references `./try` and additional try-based examples; adaptation to lab naming is incomplete."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The rust-worker skill procedure is overly rigid for setup/scaffolding features: it requires TDD and running spec tests by default, but this feature explicitly states copied tests will not pass yet.",
+      "evidence": ".factory/skills/rust-worker/SKILL.md sections 'Write Tests First (TDD)' and 'Verify with Spec Tests' vs handoff/tests.coverage ('No Rust unit tests added yet... tests copied for future use')."
+    },
+    {
+      "area": "conventions",
+      "observation": "Verification guidance for this feature focused on `spec/tests/` greps and missed stale `try` naming in top-level `spec/*.md`, allowing incomplete try→lab adaptation to pass.",
+      "evidence": "features.json verificationSteps only mention `spec/tests/`; remaining references visible in commit 0a8f758 at spec/command_line.md:6, spec/init_spec.md:25, spec/test_spec.md:39."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Fail: the feature did not fully satisfy the explicit try→lab adaptation requirement across copied spec infrastructure, with blocking leftover try references in spec markdown files."
+}

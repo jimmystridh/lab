@@ -1,0 +1,33 @@
+{
+  "featureId": "worktree-dot-shorthand",
+  "reviewedAt": "2026-04-13T05:25:31Z",
+  "commitId": "d92a20a",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "The feature adds worktree command wiring, dot shorthand handling, and collision resolution, but `cmd_worktree` does not satisfy the non-git fallback contract: it always emits `script_worktree`, which includes `git worktree add` text even when invoked outside git repositories.",
+    "issues": [
+      {
+        "file": "src/commands/worktree.rs",
+        "line": 115,
+        "severity": "blocking",
+        "description": "`cmd_worktree` always calls `script::script_worktree(...)` and never branches to `script::script_mkdir_cd(...)` for non-git directories. This violates the feature contract/expected behavior requiring non-git worktree invocations to emit mkdir-only scripts (no `worktree add` command text)."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "knowledge",
+      "observation": "Validation contract and shell spec test expectations are misaligned for non-git worktree behavior, which can allow contract violations to pass tests.",
+      "evidence": "validation-contract.md:100-103 requires `lab worktree` in non-git dirs to emit mkdir output with no `worktree add`; spec/tests/test_12_worktree.sh:25-39 only asserts mkdir presence and explicitly documents the guarded worktree command as acceptable."
+    },
+    {
+      "area": "skills",
+      "observation": "When Ruby behavior and validation contract diverge, the current worker procedure lacks an explicit precedence rule to prefer the validation contract.",
+      "evidence": "rust-worker SKILL.md asks workers to match Ruby exactly and read fulfills IDs; transcript skeleton states the worker treated guarded `script_worktree` output as correct by citing Ruby behavior even though VAL-CLI-020 requires no `worktree add` in output."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed with one blocking correctness issue: non-git `worktree` output still includes `git worktree add` because `cmd_worktree` never switches to mkdir-only script generation."
+}

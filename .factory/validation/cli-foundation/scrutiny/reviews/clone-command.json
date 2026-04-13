@@ -1,0 +1,28 @@
+{
+  "featureId": "clone-command",
+  "reviewedAt": "2026-04-13T05:24:46Z",
+  "commitId": "c8872f5",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "Feature implementation is close, but one blocking correctness gap remains: invalid git URIs are not consistently rejected when a custom name is provided.",
+    "issues": [
+      {
+        "file": "src/commands/clone.rs",
+        "line": 23,
+        "severity": "blocking",
+        "description": "`generate_clone_directory_name` returns early for non-empty `custom_name` without validating/parsing the URI. This allows `cmd_clone` to succeed for unparseable URIs when a custom name is passed (e.g., `lab clone not-a-valid-uri customname` exits 0 and emits a clone script), conflicting with the required behavior that unparseable URIs must error and exit 1."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The rust-worker skill says Ruby is ground truth and to match Ruby exactly, but this feature had an intentional contract-level divergence (custom clone names are date-prefixed in lab). This mismatch can mislead workers and cause avoidable decision churn.",
+      "evidence": ".factory/skills/rust-worker/SKILL.md:34 and :50 mandate Ruby parity; worker transcript explicitly documents reconciling this conflict via validation contract (worker-transcripts.jsonl line 6, mentions VAL-CLI-015 vs Ruby custom-name behavior)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Reviewed handoff, transcript skeleton, and commit c8872f5 diff. Found one blocking issue: invalid URIs are accepted when a custom clone name is supplied, violating the unparseable-URI error requirement. Added one shared-state observation about a skill/procedure mismatch between Ruby-parity guidance and mission contract expectations."
+}

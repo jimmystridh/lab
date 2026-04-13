@@ -1,0 +1,40 @@
+{
+  "featureId": "cli-parsing-help",
+  "reviewedAt": "2026-04-13T05:24:55Z",
+  "commitId": "2d69162",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "Implementation satisfies many behavioral checks (stderr help/version, no-arg exit 2, path/env handling) but misses explicit feature requirements: clap derive parsing and top-level cd command support.",
+    "issues": [
+      {
+        "file": "src/cli.rs",
+        "line": 8,
+        "severity": "blocking",
+        "description": "Feature requires CLI parsing via clap derive macros, but implementation intentionally bypasses clap and performs fully manual parsing ('We do NOT use clap...'). This does not satisfy the requested implementation approach in the feature description and AGENTS convention."
+      },
+      {
+        "file": "src/cli.rs",
+        "line": 37,
+        "severity": "blocking",
+        "description": "Top-level command set is incomplete: `Command` enum and parser do not include `cd` (required commands: init, install, clone, worktree, exec, cd). `lab cd ...` is treated as a query/positional args instead of a command."
+      },
+      {
+        "file": "src/cli.rs",
+        "line": 184,
+        "severity": "non_blocking",
+        "description": "No-args help guard ignores `and_confirm`; `lab --and-confirm <text>` with no command falls into Help(2) instead of normal Run path unlike other hidden test flags. This inconsistency can break test-flag semantics."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Project convention requires clap derive macros, but the worker deliberately implemented manual parsing because help/version must go to stderr. This constraint mismatch is not clearly documented as an allowed exception.",
+      "evidence": "AGENTS.md says 'Use `clap` derive macros for CLI argument parsing'; worker transcript states 'I should handle this manually rather than using clap derive macros', and handoff.skillFeedback suggests changing the feature description because of this conflict."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed with 2 blocking requirement-alignment issues: clap derive macros were not used, and the required top-level `cd` command was not implemented in parsing/dispatch. Also noted one non-blocking hidden-flag edge-case inconsistency and a shared-state convention mismatch around clap-vs-stderr behavior."
+}

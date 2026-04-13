@@ -1,0 +1,28 @@
+{
+  "featureId": "scoring-fuzzy-matching",
+  "reviewedAt": "2026-04-13T05:25:30Z",
+  "commitId": "fda98fbb6ea19bf1e64279bb89ad0d473ae5938b",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "fail",
+  "codeReview": {
+    "summary": "Core directory loading and subsequence matching are implemented with good test coverage, but the final fuzzy score formula diverges from the referenced Ruby algorithm by excluding base_score from density/length multipliers.",
+    "issues": [
+      {
+        "file": "src/fuzzy.rs",
+        "line": 161,
+        "severity": "blocking",
+        "description": "The implementation applies density/length multipliers only to the fuzzy component (`score - base_score`) and then adds `base_score` back (`score = fuzzy_component * density * length_factor + entry.base_score`). In the reference algorithm (`/Users/js/code/3rd/try/lib/fuzzy.rb`, lines 129-132), both multipliers are applied to the total running score (which already includes base_score). This changes ranking behavior for non-empty queries and does not match the specified 'exact algorithm' reference."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The rust-worker skill requires running spec tests when corresponding specs exist, but this run reported `followedProcedure: true` without running spec-test commands.",
+      "evidence": "Skill file `.factory/skills/rust-worker/SKILL.md` step 7 requires `cargo build && bash spec/tests/runner.sh ./target/debug/lab` when relevant specs exist. Handoff `verification.commandsRun` for session `0519e5a9-d098-4c99-a8cc-7b9305636999` includes cargo test/clippy/check only; no spec runner command is present."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Review failed due to a blocking scoring-formula mismatch in `src/fuzzy.rs` versus the referenced Ruby implementation. Noted one shared-state skill/procedure consistency gap around spec-test execution reporting."
+}
