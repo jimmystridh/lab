@@ -17,6 +17,10 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Option<TuiOutcome> {
         return handle_rename_key(app, key);
     }
 
+    if app.is_graduating() {
+        return handle_graduate_key(app, key);
+    }
+
     if app.is_confirming_delete() {
         return handle_delete_confirmation_key(app, key);
     }
@@ -102,6 +106,31 @@ fn handle_rename_key(app: &mut App, key: KeyEvent) -> Option<TuiOutcome> {
     }
 }
 
+fn handle_graduate_key(app: &mut App, key: KeyEvent) -> Option<TuiOutcome> {
+    match key.code {
+        KeyCode::Enter => match app.submit_graduate() {
+            Ok(Some(selection)) => Some(TuiOutcome::Graduate(selection)),
+            Ok(None) | Err(_) => None,
+        },
+        KeyCode::Esc => {
+            app.cancel_graduate();
+            None
+        }
+        KeyCode::Backspace => {
+            app.backspace();
+            None
+        }
+        KeyCode::Char(character) if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            handle_graduate_control_key(app, character)
+        }
+        KeyCode::Char(character) => {
+            app.insert_char(character);
+            None
+        }
+        _ => None,
+    }
+}
+
 fn handle_delete_confirmation_key(app: &mut App, key: KeyEvent) -> Option<TuiOutcome> {
     match key.code {
         KeyCode::Enter => app.submit_delete_confirmation().map(TuiOutcome::Delete),
@@ -170,6 +199,10 @@ fn handle_control_key(app: &mut App, character: char) -> Option<TuiOutcome> {
             app.move_input_forward();
             None
         }
+        'g' => {
+            app.begin_graduate();
+            None
+        }
         'h' => {
             app.backspace();
             None
@@ -210,6 +243,44 @@ fn handle_rename_control_key(app: &mut App, character: char) -> Option<TuiOutcom
         }
         'c' => {
             app.cancel_rename();
+            None
+        }
+        'e' => {
+            app.move_input_to_end();
+            None
+        }
+        'f' => {
+            app.move_input_forward();
+            None
+        }
+        'h' => {
+            app.backspace();
+            None
+        }
+        'k' => {
+            app.kill_to_end();
+            None
+        }
+        'w' => {
+            app.delete_word_backward();
+            None
+        }
+        _ => None,
+    }
+}
+
+fn handle_graduate_control_key(app: &mut App, character: char) -> Option<TuiOutcome> {
+    match character.to_ascii_lowercase() {
+        'a' => {
+            app.move_input_to_start();
+            None
+        }
+        'b' => {
+            app.move_input_back();
+            None
+        }
+        'c' => {
+            app.cancel_graduate();
             None
         }
         'e' => {
@@ -513,6 +584,41 @@ mod tests {
     }
 
     #[test]
+    fn test_ctrl_g_opens_graduate_dialog_with_prefilled_destination() {
+        let mut app = make_app(None);
+        app.move_down();
+
+        let outcome = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL),
+        );
+
+        assert!(outcome.is_none());
+        assert!(app.is_graduating());
+        let dialog = app.graduate_dialog.as_ref().expect("graduate dialog");
+        assert_eq!(dialog.current_name, "2025-11-15-beta");
+        assert!(dialog.input.ends_with("/beta"));
+    }
+
+    #[test]
+    fn test_ctrl_g_on_create_new_row_does_nothing() {
+        let mut app = App::new(
+            "/tmp/labs",
+            Vec::new(),
+            Some("new project"),
+            TerminalSize::new(80, 24),
+        );
+
+        let outcome = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL),
+        );
+
+        assert!(outcome.is_none());
+        assert!(!app.is_graduating());
+    }
+
+    #[test]
     fn test_rename_enter_with_same_name_closes_dialog_without_outcome() {
         let mut app = make_app(None);
         app.begin_rename();
@@ -588,6 +694,121 @@ mod tests {
                 .and_then(|dialog| dialog.error.clone()),
             Some("Name cannot be empty".to_string())
         );
+    }
+
+    #[test]
+    fn test_graduate_enter_with_valid_destination_returns_graduate_outcome() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let entry_path = dir.path().join("2025-11-15-beta");
+        fs::create_dir(&entry_path).expect("mkdir source");
+        let entry = Entry {
+            name: "2025-11-15-beta".to_string(),
+            path: entry_path.clone(),
+            is_symlink: false,
+            mtime: SystemTime::now(),
+            base_score: 1.0,
+        };
+        let mut app = App::new(dir.path(), vec![entry], None, TerminalSize::new(80, 24));
+        app.begin_graduate();
+        let destination = dir.path().join("projects").join("graduated-beta");
+        fs::create_dir_all(destination.parent().expect("parent")).expect("mkdir parent");
+        if let Some(dialog) = app.graduate_dialog.as_mut() {
+            dialog.input = destination.to_string_lossy().into_owned();
+            dialog.cursor_pos = dialog.input.chars().count();
+        }
+
+        let outcome = handle_key(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert_eq!(
+            outcome,
+            Some(TuiOutcome::Graduate(crate::tui::app::GraduateSelection {
+                source: entry_path,
+                dest: destination,
+                basename: "2025-11-15-beta".to_string(),
+                base_path: dir.path().to_path_buf(),
+            }))
+        );
+    }
+
+    #[test]
+    fn test_graduate_validation_error_stays_in_dialog() {
+        let mut app = make_app(None);
+        app.begin_graduate();
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('k'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+
+        let outcome = handle_key(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert!(outcome.is_none());
+        assert!(app.is_graduating());
+        assert_eq!(
+            app.graduate_dialog
+                .as_ref()
+                .and_then(|dialog| dialog.error.clone()),
+            Some("Destination cannot be empty".to_string())
+        );
+    }
+
+    #[test]
+    fn test_graduate_escape_and_ctrl_c_cancel_dialog_without_exiting_selector() {
+        for key in [
+            KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+        ] {
+            let mut app = make_app(None);
+            app.begin_graduate();
+
+            let outcome = handle_key(&mut app, key);
+
+            assert!(outcome.is_none());
+            assert!(!app.is_graduating());
+        }
+    }
+
+    #[test]
+    fn test_graduate_line_editing_uses_ctrl_bindings() {
+        let mut app = make_app(None);
+        app.begin_graduate();
+
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('k'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        for character in "/tmp/new project".chars() {
+            assert!(handle_key(
+                &mut app,
+                KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE),
+            )
+            .is_none());
+        }
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('~'), KeyModifiers::NONE),
+        )
+        .is_none());
+
+        let dialog = app.graduate_dialog.as_ref().expect("graduate dialog");
+        assert_eq!(dialog.input, "/tmp/new ~");
+        assert_eq!(dialog.cursor_pos, 10);
     }
 
     #[test]

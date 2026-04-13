@@ -10,7 +10,7 @@ pub mod render;
 pub mod test_keys;
 
 use self::{
-    app::{App, DeleteSelection, RenameSelection, TerminalSize},
+    app::{App, DeleteSelection, GraduateSelection, RenameSelection, TerminalSize},
     input::handle_key,
     test_keys::TestKeySource,
 };
@@ -46,6 +46,8 @@ pub enum TuiOutcome {
     Delete(DeleteSelection),
     /// Rename confirmed for an existing entry.
     Rename(RenameSelection),
+    /// Graduate confirmed for an existing entry.
+    Graduate(GraduateSelection),
     /// Selector cancelled without emitting a shell script.
     Cancelled,
 }

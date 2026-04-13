@@ -108,8 +108,8 @@ else
 fi
 
 # Test: Symlink target matches the mv destination
-mv_dest=$(echo "$output" | grep "^mv \|^  mv " | grep -oP "'\K[^']+(?=')" | tail -1)
-ln_target=$(echo "$output" | grep "ln -s " | grep -oP "'\K[^']+(?=')" | head -1)
+mv_dest=$(printf '%s\n' "$output" | sed -nE "/^ *mv /{s/^.*'([^']*)'[^']*$/\1/p; q;}")
+ln_target=$(printf '%s\n' "$output" | sed -nE "/ln -s /{s/^[^']*'([^']*)'.*$/\1/p; q;}")
 if [ "$mv_dest" = "$ln_target" ]; then
     pass
 else

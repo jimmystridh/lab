@@ -76,6 +76,12 @@ fn commands_for_outcome(outcome: &TuiOutcome, labs_path: &Path) -> Option<Vec<St
             &selection.old_name,
             &selection.new_name,
         )),
+        TuiOutcome::Graduate(selection) => Some(script::script_graduate(
+            &selection.source.to_string_lossy(),
+            &selection.dest.to_string_lossy(),
+            &selection.basename,
+            &selection.base_path.to_string_lossy(),
+        )),
         TuiOutcome::Cancelled => None,
     }
 }
@@ -294,5 +300,43 @@ mod tests {
                 format!("cd '{}/beta'", dir.path().to_string_lossy()),
             ]
         );
+    }
+
+    #[test]
+    fn test_graduate_outcome_uses_graduate_script() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("2025-06-01-alpha");
+        fs::create_dir(&source).expect("mkdir source");
+        let destination = dir.path().join("projects").join("alpha");
+
+        let commands = commands_for_outcome(
+            &TuiOutcome::Graduate(crate::tui::app::GraduateSelection {
+                source: source.clone(),
+                dest: destination.clone(),
+                basename: "2025-06-01-alpha".to_string(),
+                base_path: dir.path().to_path_buf(),
+            }),
+            dir.path(),
+        )
+        .expect("graduate commands");
+
+        assert_eq!(
+            commands[0],
+            format!(
+                "mv '{}' '{}'",
+                source.to_string_lossy(),
+                destination.to_string_lossy()
+            )
+        );
+        assert_eq!(
+            commands[1],
+            format!(
+                "ln -s '{}' '{}/2025-06-01-alpha'",
+                destination.to_string_lossy(),
+                dir.path().to_string_lossy()
+            )
+        );
+        assert_eq!(commands[4], format!("echo '{}'", destination.to_string_lossy()));
+        assert_eq!(commands[5], format!("cd '{}'", destination.to_string_lossy()));
     }
 }

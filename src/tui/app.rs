@@ -4,9 +4,9 @@
 //! handling: loaded entries, current filter results, input buffer, selection,
 //! scroll position, mode, delete marks, and terminal size.
 
-use super::dialogs::{DeleteConfirmation, RenameDialog};
+use super::dialogs::{DeleteConfirmation, GraduateDialog, RenameDialog};
 use crate::{
-    entries::Entry,
+    entries::{has_date_prefix, Entry},
     fuzzy::{Fuzzy, MatchResult},
 };
 use chrono::Local;
@@ -61,6 +61,8 @@ pub enum Mode {
     DeleteConfirm,
     /// Rename dialog.
     Rename,
+    /// Graduate dialog.
+    Graduate,
 }
 
 /// Selection outcome derived from the current cursor position.
@@ -92,6 +94,19 @@ pub struct RenameSelection {
     pub new_name: String,
 }
 
+/// Confirmed graduate selection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraduateSelection {
+    /// Source directory to move.
+    pub source: PathBuf,
+    /// Destination project directory after graduation.
+    pub dest: PathBuf,
+    /// Original basename inside the labs directory.
+    pub basename: String,
+    /// Base labs path containing the source entry.
+    pub base_path: PathBuf,
+}
+
 /// Full TUI application state.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -118,6 +133,8 @@ pub struct App {
     pub delete_confirmation: Option<DeleteConfirmation>,
     /// Rename dialog state when active.
     pub rename_dialog: Option<RenameDialog>,
+    /// Graduate dialog state when active.
+    pub graduate_dialog: Option<GraduateDialog>,
     /// Current terminal dimensions.
     pub terminal_size: TerminalSize,
 }
@@ -147,6 +164,7 @@ impl App {
             marks: HashSet::new(),
             delete_confirmation: None,
             rename_dialog: None,
+            graduate_dialog: None,
             terminal_size: size,
         };
         app.refresh_filtered();
@@ -221,6 +239,11 @@ impl App {
     /// Whether the rename dialog is active.
     pub fn is_renaming(&self) -> bool {
         self.mode == Mode::Rename
+    }
+
+    /// Whether the graduate dialog is active.
+    pub fn is_graduating(&self) -> bool {
+        self.mode == Mode::Graduate
     }
 
     /// Return the number of marked entries.
@@ -345,6 +368,80 @@ impl App {
         Ok(Some(selection))
     }
 
+    /// Enter the graduate dialog for the currently selected real entry.
+    pub fn begin_graduate(&mut self) {
+        let Some(index) = self.current_entry_index() else {
+            return;
+        };
+
+        self.clear_delete_marks();
+        let current_name = self.entries[index].name.clone();
+        let lab_projects = env::var("LAB_PROJECTS").ok();
+        let (destination, destination_hint, destination_root) =
+            default_graduate_destination(&self.labs_path, &current_name, lab_projects.as_deref());
+        self.mode = Mode::Graduate;
+        self.graduate_dialog = Some(GraduateDialog::new(
+            current_name,
+            destination.to_string_lossy(),
+            destination_hint,
+            destination_root.to_string_lossy(),
+        ));
+    }
+
+    /// Cancel the active graduate dialog, if any.
+    pub fn cancel_graduate(&mut self) {
+        self.mode = Mode::Normal;
+        self.graduate_dialog = None;
+    }
+
+    /// Validate and submit the active graduate dialog.
+    pub fn submit_graduate(&mut self) -> Result<Option<GraduateSelection>, String> {
+        if !self.is_graduating() {
+            return Ok(None);
+        }
+
+        let Some(dialog) = self.graduate_dialog.as_ref() else {
+            self.mode = Mode::Normal;
+            return Ok(None);
+        };
+        let Some(index) = self.current_entry_index() else {
+            self.cancel_graduate();
+            return Ok(None);
+        };
+
+        let input = dialog.input.clone();
+        let trimmed = input.trim();
+        if trimmed.is_empty() {
+            return self.graduate_error("Destination cannot be empty");
+        }
+
+        let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let dest = expand_input_path(trimmed, &cwd);
+        if dest.exists() {
+            return self.graduate_error(format!(
+                "Destination already exists: {}",
+                dest.display()
+            ));
+        }
+
+        let parent = dest.parent().unwrap_or_else(|| Path::new("/"));
+        if !parent.is_dir() {
+            return self.graduate_error(format!(
+                "Parent directory does not exist: {}",
+                parent.display()
+            ));
+        }
+
+        let selection = GraduateSelection {
+            source: self.entries[index].path.clone(),
+            dest,
+            basename: self.entries[index].name.clone(),
+            base_path: self.labs_path.clone(),
+        };
+        self.cancel_graduate();
+        Ok(Some(selection))
+    }
+
     /// Move the selection down one row, clamped at the end.
     pub fn move_down(&mut self) {
         let total = self.total_items();
@@ -398,6 +495,13 @@ impl App {
             return;
         }
 
+        if self.is_graduating() {
+            if let Some(dialog) = self.graduate_dialog.as_mut() {
+                dialog.insert_char(character);
+            }
+            return;
+        }
+
         if self.is_confirming_delete() {
             if let Some(dialog) = self.delete_confirmation.as_mut() {
                 dialog.insert_char(character);
@@ -419,6 +523,13 @@ impl App {
     pub fn backspace(&mut self) {
         if self.is_renaming() {
             if let Some(dialog) = self.rename_dialog.as_mut() {
+                dialog.backspace();
+            }
+            return;
+        }
+
+        if self.is_graduating() {
+            if let Some(dialog) = self.graduate_dialog.as_mut() {
                 dialog.backspace();
             }
             return;
@@ -450,6 +561,13 @@ impl App {
             return;
         }
 
+        if self.is_graduating() {
+            if let Some(dialog) = self.graduate_dialog.as_mut() {
+                dialog.move_to_start();
+            }
+            return;
+        }
+
         if self.is_confirming_delete() {
             if let Some(dialog) = self.delete_confirmation.as_mut() {
                 dialog.move_to_start();
@@ -464,6 +582,13 @@ impl App {
     pub fn move_input_to_end(&mut self) {
         if self.is_renaming() {
             if let Some(dialog) = self.rename_dialog.as_mut() {
+                dialog.move_to_end();
+            }
+            return;
+        }
+
+        if self.is_graduating() {
+            if let Some(dialog) = self.graduate_dialog.as_mut() {
                 dialog.move_to_end();
             }
             return;
@@ -488,6 +613,13 @@ impl App {
             return;
         }
 
+        if self.is_graduating() {
+            if let Some(dialog) = self.graduate_dialog.as_mut() {
+                dialog.move_back();
+            }
+            return;
+        }
+
         if self.is_confirming_delete() {
             if let Some(dialog) = self.delete_confirmation.as_mut() {
                 dialog.move_back();
@@ -507,6 +639,13 @@ impl App {
             return;
         }
 
+        if self.is_graduating() {
+            if let Some(dialog) = self.graduate_dialog.as_mut() {
+                dialog.move_forward();
+            }
+            return;
+        }
+
         if self.is_confirming_delete() {
             if let Some(dialog) = self.delete_confirmation.as_mut() {
                 dialog.move_forward();
@@ -521,6 +660,13 @@ impl App {
     pub fn kill_to_end(&mut self) {
         if self.is_renaming() {
             if let Some(dialog) = self.rename_dialog.as_mut() {
+                dialog.kill_to_end();
+            }
+            return;
+        }
+
+        if self.is_graduating() {
+            if let Some(dialog) = self.graduate_dialog.as_mut() {
                 dialog.kill_to_end();
             }
             return;
@@ -546,6 +692,13 @@ impl App {
     pub fn delete_word_backward(&mut self) {
         if self.is_renaming() {
             if let Some(dialog) = self.rename_dialog.as_mut() {
+                dialog.delete_word_backward();
+            }
+            return;
+        }
+
+        if self.is_graduating() {
+            if let Some(dialog) = self.graduate_dialog.as_mut() {
                 dialog.delete_word_backward();
             }
             return;
@@ -679,6 +832,17 @@ impl App {
         }
         Err(message)
     }
+
+    fn graduate_error(
+        &mut self,
+        message: impl Into<String>,
+    ) -> Result<Option<GraduateSelection>, String> {
+        let message = message.into();
+        if let Some(dialog) = self.graduate_dialog.as_mut() {
+            dialog.set_error(message.clone());
+        }
+        Err(message)
+    }
 }
 
 fn is_allowed_input_char(character: char) -> bool {
@@ -704,6 +868,67 @@ fn normalize_create_name_fragment(input: &str) -> String {
     normalized
 }
 
+fn graduate_project_name(entry_name: &str) -> String {
+    if has_date_prefix(entry_name) && entry_name.len() > 11 {
+        entry_name.get(11..).unwrap_or_default().to_string()
+    } else {
+        entry_name.to_string()
+    }
+}
+
+fn default_graduate_destination(
+    labs_path: &Path,
+    entry_name: &str,
+    lab_projects: Option<&str>,
+) -> (PathBuf, String, PathBuf) {
+    let project_name = graduate_project_name(entry_name);
+    let (projects_dir, destination_hint) = resolve_graduate_projects_dir(labs_path, lab_projects);
+    (
+        projects_dir.join(project_name),
+        destination_hint,
+        projects_dir,
+    )
+}
+
+fn resolve_graduate_projects_dir(
+    labs_path: &Path,
+    lab_projects: Option<&str>,
+) -> (PathBuf, String) {
+    if let Some(path) = lab_projects.filter(|value| !value.is_empty()) {
+        return (
+            PathBuf::from(expand_tilde_path(path)),
+            "$LAB_PROJECTS".to_string(),
+        );
+    }
+
+    (
+        labs_path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| labs_path.to_path_buf()),
+        "parent of $LAB_PATH".to_string(),
+    )
+}
+
+fn expand_tilde_path(path: &str) -> String {
+    if path == "~" || path.starts_with("~/") {
+        if let Some(home) = dirs::home_dir() {
+            return path.replacen('~', &home.to_string_lossy(), 1);
+        }
+    }
+
+    path.to_string()
+}
+
+fn expand_input_path(input: &str, cwd: &Path) -> PathBuf {
+    let expanded = PathBuf::from(expand_tilde_path(input));
+    if expanded.is_absolute() {
+        expanded
+    } else {
+        cwd.join(expanded)
+    }
+}
+
 fn resolve_dimension(override_value: Option<&str>, detected: u16, default: u16) -> u16 {
     override_value
         .and_then(|value| value.parse::<u16>().ok())
@@ -714,7 +939,7 @@ fn resolve_dimension(override_value: Option<&str>, detected: u16, default: u16) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fs, path::PathBuf, time::SystemTime};
+    use std::{fs, path::{Path, PathBuf}, time::SystemTime};
 
     fn make_entry(name: &str, score: f64) -> Entry {
         Entry {
@@ -1089,6 +1314,70 @@ mod tests {
     }
 
     #[test]
+    fn test_begin_graduate_prefills_stripped_destination_in_parent_of_labs_path() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let entry = Entry {
+            name: "2025-06-01-my-experiment".to_string(),
+            path: dir.path().join("2025-06-01-my-experiment"),
+            is_symlink: false,
+            mtime: SystemTime::now(),
+            base_score: 1.0,
+        };
+        let mut app = App::new(dir.path(), vec![entry], None, TerminalSize::new(80, 24));
+
+        app.begin_graduate();
+
+        assert!(app.is_graduating());
+        let dialog = app.graduate_dialog.as_ref().expect("graduate dialog");
+        assert_eq!(dialog.current_name, "2025-06-01-my-experiment");
+        assert_eq!(
+            dialog.input,
+            dir.path()
+                .parent()
+                .expect("parent")
+                .join("my-experiment")
+                .to_string_lossy()
+        );
+        assert_eq!(dialog.destination_hint, "parent of $LAB_PATH");
+        assert_eq!(
+            dialog.destination_root,
+            dir.path().parent().expect("parent").to_string_lossy()
+        );
+    }
+
+    #[test]
+    fn test_begin_graduate_without_date_prefix_keeps_full_name() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let entry = Entry {
+            name: "plain-project".to_string(),
+            path: dir.path().join("plain-project"),
+            is_symlink: false,
+            mtime: SystemTime::now(),
+            base_score: 1.0,
+        };
+        let mut app = App::new(dir.path(), vec![entry], None, TerminalSize::new(80, 24));
+
+        app.begin_graduate();
+
+        let dialog = app.graduate_dialog.as_ref().expect("graduate dialog");
+        assert!(dialog.input.ends_with("/plain-project"));
+    }
+
+    #[test]
+    fn test_default_graduate_destination_uses_lab_projects_override() {
+        let labs_path = Path::new("/tmp/labs");
+        let (destination, hint, root) = default_graduate_destination(
+            labs_path,
+            "2025-06-01-my-experiment",
+            Some("/tmp/projects"),
+        );
+
+        assert_eq!(destination, PathBuf::from("/tmp/projects/my-experiment"));
+        assert_eq!(hint, "$LAB_PROJECTS");
+        assert_eq!(root, PathBuf::from("/tmp/projects"));
+    }
+
+    #[test]
     fn test_submit_rename_same_name_exits_dialog_without_selection() {
         let mut app = make_app(None);
         app.begin_rename();
@@ -1191,5 +1480,148 @@ mod tests {
                 .and_then(|dialog| dialog.error.clone()),
             Some("Directory exists: beta".to_string())
         );
+    }
+
+    #[test]
+    fn test_begin_graduate_on_create_new_row_does_nothing() {
+        let mut app = App::new(
+            "/tmp/labs",
+            Vec::new(),
+            Some("new project"),
+            TerminalSize::new(80, 24),
+        );
+
+        app.begin_graduate();
+
+        assert!(!app.is_graduating());
+        assert!(app.graduate_dialog.is_none());
+    }
+
+    #[test]
+    fn test_submit_graduate_rejects_empty_destination_and_stays_in_dialog() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let entry = Entry {
+            name: "2025-06-01-alpha".to_string(),
+            path: dir.path().join("2025-06-01-alpha"),
+            is_symlink: false,
+            mtime: SystemTime::now(),
+            base_score: 1.0,
+        };
+        let mut app = App::new(dir.path(), vec![entry], None, TerminalSize::new(80, 24));
+        app.begin_graduate();
+        if let Some(dialog) = app.graduate_dialog.as_mut() {
+            dialog.input = "   ".to_string();
+            dialog.cursor_pos = 3;
+        }
+
+        let error = app.submit_graduate().expect_err("graduate error");
+
+        assert_eq!(error, "Destination cannot be empty");
+        assert!(app.is_graduating());
+        assert_eq!(
+            app.graduate_dialog
+                .as_ref()
+                .and_then(|dialog| dialog.error.clone()),
+            Some("Destination cannot be empty".to_string())
+        );
+    }
+
+    #[test]
+    fn test_submit_graduate_rejects_existing_destination() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let entry_path = dir.path().join("2025-06-01-alpha");
+        fs::create_dir(&entry_path).expect("mkdir source");
+        let dest_dir = dir.path().join("projects");
+        fs::create_dir(&dest_dir).expect("mkdir projects");
+        let dest_path = dest_dir.join("alpha");
+        fs::create_dir(&dest_path).expect("mkdir destination");
+
+        let entry = Entry {
+            name: "2025-06-01-alpha".to_string(),
+            path: entry_path,
+            is_symlink: false,
+            mtime: SystemTime::now(),
+            base_score: 1.0,
+        };
+        let mut app = App::new(dir.path(), vec![entry], None, TerminalSize::new(80, 24));
+        app.begin_graduate();
+        if let Some(dialog) = app.graduate_dialog.as_mut() {
+            dialog.input = dest_path.to_string_lossy().into_owned();
+            dialog.cursor_pos = dialog.input.chars().count();
+        }
+
+        let error = app.submit_graduate().expect_err("graduate error");
+
+        assert_eq!(
+            error,
+            format!("Destination already exists: {}", dest_path.display())
+        );
+        assert!(app.is_graduating());
+    }
+
+    #[test]
+    fn test_submit_graduate_rejects_missing_parent_directory() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let entry = Entry {
+            name: "2025-06-01-alpha".to_string(),
+            path: dir.path().join("2025-06-01-alpha"),
+            is_symlink: false,
+            mtime: SystemTime::now(),
+            base_score: 1.0,
+        };
+        let mut app = App::new(dir.path(), vec![entry], None, TerminalSize::new(80, 24));
+        app.begin_graduate();
+        let missing_parent = dir.path().join("missing-parent").join("alpha");
+        if let Some(dialog) = app.graduate_dialog.as_mut() {
+            dialog.input = missing_parent.to_string_lossy().into_owned();
+            dialog.cursor_pos = dialog.input.chars().count();
+        }
+
+        let error = app.submit_graduate().expect_err("graduate error");
+
+        assert_eq!(
+            error,
+            format!(
+                "Parent directory does not exist: {}",
+                missing_parent.parent().expect("parent").display()
+            )
+        );
+        assert!(app.is_graduating());
+    }
+
+    #[test]
+    fn test_submit_graduate_returns_selection_and_closes_dialog() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let entry_path = dir.path().join("2025-06-01-my-experiment");
+        fs::create_dir(&entry_path).expect("mkdir source");
+        let projects_dir = dir.path().join("projects");
+        fs::create_dir(&projects_dir).expect("mkdir projects");
+        let destination = projects_dir.join("graduated-project");
+
+        let entry = Entry {
+            name: "2025-06-01-my-experiment".to_string(),
+            path: entry_path.clone(),
+            is_symlink: false,
+            mtime: SystemTime::now(),
+            base_score: 1.0,
+        };
+        let mut app = App::new(dir.path(), vec![entry], None, TerminalSize::new(80, 24));
+        app.begin_graduate();
+        if let Some(dialog) = app.graduate_dialog.as_mut() {
+            dialog.input = destination.to_string_lossy().into_owned();
+            dialog.cursor_pos = dialog.input.chars().count();
+        }
+
+        let selection = app
+            .submit_graduate()
+            .expect("graduate result")
+            .expect("graduate selection");
+
+        assert_eq!(selection.source, entry_path);
+        assert_eq!(selection.dest, destination);
+        assert_eq!(selection.basename, "2025-06-01-my-experiment");
+        assert_eq!(selection.base_path, dir.path());
+        assert!(!app.is_graduating());
+        assert!(app.graduate_dialog.is_none());
     }
 }

@@ -168,6 +168,42 @@ pub fn script_rename(base_path: &str, old_name: &str, new_name: &str) -> Vec<Str
     ]
 }
 
+/// Build commands for graduating a lab into a project directory.
+///
+/// Regular directories are moved with `mv`. Git worktrees (identified by a
+/// `.git` file inside the source directory) use `git worktree move` so git's
+/// bookkeeping stays consistent. After the move, the original labs entry is
+/// recreated as a symlink pointing at the destination, a graduation message is
+/// echoed, and the script finishes with the standard touch + echo + cd
+/// sequence for the destination path.
+pub fn script_graduate(source: &str, dest: &str, basename: &str, base_path: &str) -> Vec<String> {
+    let symlink_path = Path::new(base_path).join(basename);
+    let symlink_path = symlink_path.to_string_lossy().into_owned();
+    let is_worktree = Path::new(source).join(".git").is_file();
+
+    let mut cmds = Vec::new();
+    if is_worktree {
+        cmds.push(format!(
+            "git worktree move {} {}",
+            quote_path(source),
+            quote_path(dest)
+        ));
+    } else {
+        cmds.push(format!("mv {} {}", quote_path(source), quote_path(dest)));
+    }
+    cmds.push(format!(
+        "ln -s {} {}",
+        quote_path(dest),
+        quote_path(&symlink_path)
+    ));
+    cmds.push(format!(
+        "echo {}",
+        quote_path(&format!("Graduated: {basename} → {dest}"))
+    ));
+    cmds.extend(script_cd(dest));
+    cmds
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -634,6 +670,104 @@ mod tests {
         assert_eq!(lines[2], "  mv 'old' 'new' && \\");
         assert_eq!(lines[3], "  echo '/tmp/labs/new' && \\");
         assert_eq!(lines[4], "  cd '/tmp/labs/new'");
+    }
+
+    #[test]
+    fn test_script_graduate_regular_directory_uses_mv_and_symlink() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("2025-06-01-alpha");
+        std::fs::create_dir(&source).expect("mkdir source");
+        let dest = dir.path().join("projects").join("alpha");
+
+        let cmds = script_graduate(
+            source.to_str().expect("source"),
+            dest.to_str().expect("dest"),
+            "2025-06-01-alpha",
+            dir.path().to_str().expect("base path"),
+        );
+
+        assert_eq!(
+            cmds[0],
+            format!(
+                "mv '{}' '{}'",
+                source.to_string_lossy(),
+                dest.to_string_lossy()
+            )
+        );
+        assert_eq!(
+            cmds[1],
+            format!(
+                "ln -s '{}' '{}/2025-06-01-alpha'",
+                dest.to_string_lossy(),
+                dir.path().to_string_lossy()
+            )
+        );
+        assert_eq!(
+            cmds[2],
+            format!(
+                "echo 'Graduated: 2025-06-01-alpha → {}'",
+                dest.to_string_lossy()
+            )
+        );
+        assert_eq!(cmds[3], format!("touch '{}'", dest.to_string_lossy()));
+        assert_eq!(cmds[4], format!("echo '{}'", dest.to_string_lossy()));
+        assert_eq!(cmds[5], format!("cd '{}'", dest.to_string_lossy()));
+    }
+
+    #[test]
+    fn test_script_graduate_worktree_uses_git_worktree_move() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("2025-06-01-worktree");
+        std::fs::create_dir_all(&source).expect("mkdir source");
+        std::fs::write(source.join(".git"), "gitdir: /tmp/repo/.git/worktrees/worktree")
+            .expect("write git file");
+        let dest = dir.path().join("projects").join("worktree");
+
+        let cmds = script_graduate(
+            source.to_str().expect("source"),
+            dest.to_str().expect("dest"),
+            "2025-06-01-worktree",
+            dir.path().to_str().expect("base path"),
+        );
+
+        assert_eq!(
+            cmds[0],
+            format!(
+                "git worktree move '{}' '{}'",
+                source.to_string_lossy(),
+                dest.to_string_lossy()
+            )
+        );
+        assert!(cmds.iter().all(|command| !command.starts_with("mv ")));
+    }
+
+    #[test]
+    fn test_graduate_script_full_output() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("2025-06-01-alpha");
+        std::fs::create_dir(&source).expect("mkdir source");
+        let dest = dir.path().join("projects").join("alpha");
+
+        let cmds = script_graduate(
+            source.to_str().expect("source"),
+            dest.to_str().expect("dest"),
+            "2025-06-01-alpha",
+            dir.path().to_str().expect("base path"),
+        );
+        let output = capture_emit_script(&cmds);
+        let lines: Vec<&str> = output.lines().collect();
+
+        assert_eq!(lines[0], SCRIPT_WARNING);
+        assert!(lines[1].starts_with("mv "));
+        assert!(lines[1].ends_with(" && \\"));
+        assert!(lines[2].starts_with("  ln -s "));
+        assert!(lines[2].ends_with(" && \\"));
+        assert!(lines[3].starts_with("  echo 'Graduated: 2025-06-01-alpha"));
+        assert!(lines[3].ends_with(" && \\"));
+        assert!(lines[4].starts_with("  touch "));
+        assert!(lines[5].starts_with("  echo "));
+        assert!(lines[6].starts_with("  cd "));
+        assert!(!lines[6].ends_with(" && \\"));
     }
 
     // ---- Integration: emit_script with script builders ----

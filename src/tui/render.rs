@@ -253,6 +253,10 @@ fn build_lines(app: &App, width: u16, height: u16) -> Vec<StyledLine> {
         return build_rename_dialog_lines(app, width, height);
     }
 
+    if app.is_graduating() {
+        return build_graduate_dialog_lines(app, width, height);
+    }
+
     if app.is_confirming_delete() {
         return build_delete_confirmation_lines(app, width, height);
     }
@@ -493,6 +497,76 @@ fn build_rename_dialog_lines(app: &App, width: u16, height: u16) -> Vec<StyledLi
     lines
 }
 
+fn build_graduate_dialog_lines(app: &App, width: u16, height: u16) -> Vec<StyledLine> {
+    let body_rows = dialog_body_height(height);
+    let dialog = app.graduate_dialog.as_ref();
+    let current_name = dialog
+        .map(|dialog| dialog.current_name.as_str())
+        .unwrap_or_default();
+    let input = dialog
+        .map(|dialog| dialog.input.as_str())
+        .unwrap_or_default();
+    let cursor_pos = dialog.map(|dialog| dialog.cursor_pos).unwrap_or(0);
+    let error = dialog.and_then(|dialog| dialog.error.as_deref());
+    let destination_hint = dialog
+        .map(|dialog| dialog.destination_hint.as_str())
+        .unwrap_or("parent of $LAB_PATH");
+    let destination_root = dialog
+        .map(|dialog| dialog.destination_root.as_str())
+        .unwrap_or_default();
+    let mut body = vec![
+        build_rename_current_line(current_name, width),
+        blank_line(width, Background::None),
+        build_graduate_hint_line(destination_hint, destination_root, width),
+        build_graduate_prompt_line(input, cursor_pos, width),
+    ];
+
+    if let Some(error) = error {
+        body.push(centered_line(
+            width,
+            "A symlink will be left in the labs directory",
+            SegmentStyleSpec::muted(),
+        ));
+        body.push(centered_line(
+            width,
+            error,
+            SegmentStyleSpec::normal().bold(),
+        ));
+    } else {
+        body.push(blank_line(width, Background::None));
+        body.push(centered_line(
+            width,
+            "A symlink will be left in the labs directory",
+            SegmentStyleSpec::muted(),
+        ));
+    }
+
+    body.truncate(body_rows);
+    while body.len() < body_rows {
+        body.push(blank_line(width, Background::None));
+    }
+
+    let mut lines = Vec::with_capacity(body_rows + 4);
+    lines.push(centered_segments_line(
+        width,
+        vec![
+            StyledSegment::new("🚀", SegmentStyleSpec::normal()),
+            StyledSegment::new("  Graduate lab to project", SegmentStyleSpec::accent()),
+        ],
+        Background::None,
+    ));
+    lines.push(separator_line(width));
+    lines.extend(body);
+    lines.push(separator_line(width));
+    lines.push(centered_line(
+        width,
+        "Enter: Confirm  Esc: Cancel",
+        SegmentStyleSpec::muted(),
+    ));
+
+    lines
+}
+
 fn build_delete_dialog_item_line(name: &str, width: u16) -> StyledLine {
     fill_line(
         width,
@@ -533,6 +607,20 @@ fn build_rename_current_line(current_name: &str, width: u16) -> StyledLine {
 
 fn build_rename_prompt_line(input: &str, cursor_pos: usize, width: u16) -> StyledLine {
     let mut segments = vec![StyledSegment::new("New name: ", SegmentStyleSpec::muted())];
+    segments.extend(input_segments(input, cursor_pos));
+    centered_segments_line(width, segments, Background::None)
+}
+
+fn build_graduate_hint_line(destination_hint: &str, destination_root: &str, width: u16) -> StyledLine {
+    centered_line(
+        width,
+        &format!("Destination ({destination_hint}: {destination_root})"),
+        SegmentStyleSpec::muted(),
+    )
+}
+
+fn build_graduate_prompt_line(input: &str, cursor_pos: usize, width: u16) -> StyledLine {
+    let mut segments = vec![StyledSegment::new("Move to: ", SegmentStyleSpec::muted())];
     segments.extend(input_segments(input, cursor_pos));
     centered_segments_line(width, segments, Background::None)
 }
@@ -949,7 +1037,10 @@ fn format_relative_time(mtime: SystemTime) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tui::app::TerminalSize;
+    use crate::tui::{
+        app::{Mode, TerminalSize},
+        dialogs::GraduateDialog,
+    };
     use std::{
         path::PathBuf,
         time::{Duration, SystemTime},
@@ -1221,6 +1312,63 @@ mod tests {
         let rendered = snapshot(&app, true);
 
         assert!(rendered.contains("Name cannot be empty"));
+    }
+
+    #[test]
+    fn test_graduate_dialog_renders_title_destination_and_prefilled_input() {
+        let mut app = make_app(
+            vec![make_entry("2025-11-29-project", false, SystemTime::now())],
+            90,
+            10,
+            None,
+        );
+        app.mode = Mode::Graduate;
+        app.graduate_dialog = Some(GraduateDialog::new(
+            "2025-11-29-project",
+            "/tmp/projects/project",
+            "$LAB_PROJECTS",
+            "/tmp/projects",
+        ));
+
+        let rendered = snapshot(&app, true);
+        let lines = rendered.lines().collect::<Vec<_>>();
+
+        assert!(lines[0].contains("🚀"));
+        assert!(lines[0].contains("Graduate lab to project"));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("📁 2025-11-29-project")));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("Destination ($LAB_PROJECTS: /tmp/projects)")));
+        assert!(lines.iter().any(|line| line.contains("Move to: ")));
+        assert!(rendered.contains("/tmp/projects/project\x1b[7m \x1b[0m"));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("A symlink will be left in the labs directory")));
+    }
+
+    #[test]
+    fn test_graduate_dialog_renders_validation_error() {
+        let mut app = make_app(
+            vec![make_entry("alpha", false, SystemTime::now())],
+            90,
+            10,
+            None,
+        );
+        app.mode = Mode::Graduate;
+        let mut dialog = GraduateDialog::new(
+            "alpha",
+            "/tmp/projects/alpha",
+            "parent of $LAB_PATH",
+            "/tmp/projects",
+        );
+        dialog.set_error("Destination cannot be empty");
+        app.graduate_dialog = Some(dialog);
+
+        let rendered = snapshot(&app, true);
+
+        assert!(rendered.contains("Destination cannot be empty"));
     }
 
     #[test]
