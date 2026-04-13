@@ -130,10 +130,21 @@ fn main() {
                     process::exit(1);
                 }
                 Some(cli::Command::Exec) => {
-                    // TODO: Implement exec routing in commands/cd.rs
-                    // For now, handle test flags minimally
+                    // Load entries and apply fuzzy matching
+                    let all_entries = entries::load_entries(&labs_path);
+                    let query = args.args.join(" ");
+                    let height: usize = std::env::var("LAB_HEIGHT")
+                        .ok()
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(24);
+                    let limit = std::cmp::max(height.saturating_sub(6), 3);
+
+                    let fuzz = fuzzy::Fuzzy::new(&all_entries);
+                    let _results = fuzz.match_entries(&query, limit);
+
                     if args.and_exit {
                         // Render one frame and exit (TUI test mode)
+                        // TUI rendering not yet implemented, but entries are loaded
                         eprintln!("lab: TUI not yet implemented");
                         process::exit(1);
                     }
@@ -143,6 +154,17 @@ fn main() {
                 None => {
                     // Default: treat remaining args as search query → TUI selector
                     // Same as `lab exec [query]`
+                    let all_entries = entries::load_entries(&labs_path);
+                    let query = args.args.join(" ");
+                    let height: usize = std::env::var("LAB_HEIGHT")
+                        .ok()
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(24);
+                    let limit = std::cmp::max(height.saturating_sub(6), 3);
+
+                    let fuzz = fuzzy::Fuzzy::new(&all_entries);
+                    let _results = fuzz.match_entries(&query, limit);
+
                     if args.and_exit {
                         eprintln!("lab: TUI not yet implemented");
                         process::exit(1);
