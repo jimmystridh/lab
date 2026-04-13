@@ -14,7 +14,7 @@ mkdir -p "$TMUX_TEST_DIR/2025-11-02-beta"
 tui_start "$LAB_CMD --path='$TMUX_TEST_DIR' exec"
 tui_wait 0.3
 
-tui_assert_substr "Try Directory Selection" "TUI should show header"
+tui_assert_substr "Lab Directory Selection" "TUI should show header"
 
 # Test: TUI shows directories
 tui_assert_substr "alpha" "TUI should show first directory"

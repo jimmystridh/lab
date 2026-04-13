@@ -14,7 +14,7 @@ use ratatui::{
 };
 use std::{sync::atomic::Ordering, time::SystemTime};
 
-const TITLE: &str = " Try Directory Selection";
+const TITLE: &str = " Lab Directory Selection";
 const FOOTER_HINTS: &str =
     "↑/↓: Navigate  Enter: Select  ^R: Rename  ^G: Graduate  ^D: Delete  Esc: Cancel";
 
@@ -790,7 +790,7 @@ mod tests {
 
         assert_eq!(lines.len(), 8);
         assert!(lines[0].contains("🏠"));
-        assert!(lines[0].contains("Try Directory Selection"));
+        assert!(lines[0].contains("Lab Directory Selection"));
         assert!(lines[0].ends_with("/tmp/labs"));
         assert_eq!(lines[1], "─".repeat(60));
         assert!(lines[2].starts_with("Search: "));

@@ -132,7 +132,7 @@ fi
 # Test: Header at row 1 (screen control skipped in test mode)
 output=$(lab_run --path="$TEST_LABS" --and-exit exec 2>&1)
 # In test mode, home sequence is skipped - just verify output starts with header
-if echo "$output" | grep -qE $'\x1b\[H' || echo "$output" | grep -q "Try Selector"; then
+if echo "$output" | grep -qE $'\x1b\[H' || echo "$output" | grep -q "Lab Directory Selection"; then
     pass
 else
     fail "should position at home" "home sequence or header visible" "$output" "tui_spec.md#screen-position"
