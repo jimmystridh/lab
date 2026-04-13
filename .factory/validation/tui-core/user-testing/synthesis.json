@@ -1,0 +1,33 @@
+{
+  "milestone": "tui-core",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 45,
+    "passed": 45,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-CROSS-002", "VAL-CROSS-003", "VAL-CROSS-006", "VAL-CROSS-009", "VAL-CROSS-012",
+    "VAL-FUZZY-012",
+    "VAL-TUI-001", "VAL-TUI-002", "VAL-TUI-003", "VAL-TUI-004", "VAL-TUI-005",
+    "VAL-TUI-006", "VAL-TUI-007", "VAL-TUI-008", "VAL-TUI-009", "VAL-TUI-010",
+    "VAL-TUI-011", "VAL-TUI-012", "VAL-TUI-013", "VAL-TUI-014", "VAL-TUI-015",
+    "VAL-TUI-016", "VAL-TUI-017", "VAL-TUI-018", "VAL-TUI-019", "VAL-TUI-020",
+    "VAL-TUI-021", "VAL-TUI-022", "VAL-TUI-023", "VAL-TUI-024", "VAL-TUI-025",
+    "VAL-TUI-026", "VAL-TUI-027", "VAL-TUI-028", "VAL-TUI-029", "VAL-TUI-030",
+    "VAL-TUI-031", "VAL-TUI-032", "VAL-TUI-033", "VAL-TUI-034", "VAL-TUI-035",
+    "VAL-TUI-036", "VAL-TUI-037", "VAL-TUI-038", "VAL-TUI-039", "VAL-TUI-040"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Added 'Flow Validator Guidance: tui-core-shell' section with binary path, test fixture patterns, symlink/git testing templates, and evidence paths",
+      "source": "setup"
+    }
+  ],
+  "previousRound": null
+}

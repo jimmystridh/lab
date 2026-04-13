@@ -1,0 +1,182 @@
+{
+  "groupId": "group4-sizing",
+  "testedAt": "2026-04-13T08:00:00Z",
+  "isolation": {
+    "binaryPath": "/Users/js/code/rust/lab/target/debug/lab",
+    "testDir": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/tmp.m0jtpw9hHb",
+    "evidenceDir": "/Users/js/.factory/missions/4e064f1d-55c5-4e80-9c43-b2e62ac80846/evidence/tui-core/group4-sizing/"
+  },
+  "toolsUsed": ["shell-commands", "python3-pty"],
+  "assertions": [
+    {
+      "id": "VAL-TUI-019",
+      "title": "Viewport scrolls to keep cursor visible",
+      "status": "pass",
+      "steps": [
+        { "action": "Create 20 entries in temp dir, set LAB_HEIGHT=12 (7 body rows)", "expected": "Test fixture ready", "observed": "20 entries created" },
+        { "action": "Run --and-exit --and-keys='DOWN x15' to move cursor past visible area", "expected": "Cursor at index 15, viewport scrolled", "observed": "Viewport shows entries 11-05, cursor on entry05 (index 15) with → arrow" },
+        { "action": "Verify selected entry is visible in output", "expected": "Selected entry in viewport", "observed": "entry05 visible at bottom of viewport with → indicator, entries above it also visible" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group4-sizing/VAL-TUI-019-scrolled.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-020",
+      "title": "Scroll resets when filter changes",
+      "status": "pass",
+      "steps": [
+        { "action": "Scroll down 10 times with DOWN keys", "expected": "Viewport scrolled from initial position", "observed": "Keys processed" },
+        { "action": "Type 'e' character to change filter", "expected": "Scroll offset resets to 0, first filtered entry visible", "observed": "Search shows 'e', first filtered entry (entry20) selected with → at top of list" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group4-sizing/VAL-TUI-020-reset.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-021",
+      "title": "Standard terminal (80x24) renders correctly",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit with LAB_WIDTH=80 LAB_HEIGHT=24", "expected": "Header, body with metadata, footer all visible", "observed": "24 lines: header (title 'Lab Directory Selection' + separator + search), 19 body entries with timestamps ('just now') and scores ('5.0'), footer (separator + keybinds)" },
+        { "action": "Verify metadata visibility", "expected": "Timestamps and scores in entries", "observed": "Each entry shows 'just now, 5.0' right-aligned" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group4-sizing/VAL-TUI-021-80x24.txt", "tui-core/group4-sizing/VAL-TUI-030-stderr.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-022",
+      "title": "Narrow terminal (20-40 cols) degrades gracefully",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit with LAB_WIDTH=30 LAB_HEIGHT=24", "expected": "No crash, graceful degradation", "observed": "Exit code 1, UI renders. Names fit at 30 cols (short names). Metadata truncated to 'w, 5.0'. Footer truncated to partial keybinds." },
+        { "action": "Run --and-exit with LAB_WIDTH=20 LAB_HEIGHT=24", "expected": "Names truncated with …, no crash", "observed": "Exit code 1, UI renders. Names truncated with … (e.g., '2025-09-01-en…'). Title truncated. Footer truncated. No metadata shown (no space). No crash." }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group4-sizing/VAL-TUI-022-30x24.txt", "tui-core/group4-sizing/VAL-TUI-022-20x24.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-023",
+      "title": "Short terminal (8-12 rows) shows minimal UI",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit with LAB_WIDTH=80 LAB_HEIGHT=8", "expected": "Header + footer + minimum 3 body rows, no crash", "observed": "8 lines total: 3 header (title, separator, search) + 3 body (entry20, entry19, entry18) + 2 footer (separator, keybinds). Exactly 3 body rows = minimum met." }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group4-sizing/VAL-TUI-023-80x8.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-028",
+      "title": "Long names truncated with ellipsis",
+      "status": "pass",
+      "steps": [
+        { "action": "Create entry with long name 'this-is-a-very-long-directory-name-that-should-be-truncated'", "expected": "Entry created", "observed": "Entry created in test dir" },
+        { "action": "Run --and-exit with LAB_WIDTH=40 LAB_HEIGHT=10", "expected": "Long name truncated with …", "observed": "Name shown as '2025-06-15-this-is-a-very-long-di…' with Unicode ellipsis at truncation point" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group4-sizing/VAL-TUI-028-truncated.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-030",
+      "title": "--and-exit renders one frame then exits",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit, capture stdout and stderr separately", "expected": "stderr has frame content, stdout empty, exit code 1", "observed": "stderr: 3054 bytes (full TUI frame with header, entries, footer). stdout: 0 bytes. Exit code: 1." },
+        { "action": "Verify no key reading occurred", "expected": "Immediate exit without waiting for input", "observed": "Command returned immediately without blocking" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group4-sizing/VAL-TUI-030-stderr.txt", "tui-core/group4-sizing/VAL-TUI-030-stdout.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-031",
+      "title": "--and-keys injects key sequence",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-keys='DOWN,ENTER' (symbolic format)", "expected": "Selects 2nd entry, outputs cd script", "observed": "Exit code 0, stdout contains cd script for entry19 (2nd entry). Selection changed by DOWN key." },
+        { "action": "Test UP after DOWN: --and-exit --and-keys='DOWN,DOWN,UP'", "expected": "Cursor back on first entry", "observed": "Selected entry is entry20 (first entry), confirming UP key works" },
+        { "action": "Test ESC symbolic key", "expected": "Exit code 1, empty stdout", "observed": "Exit code 1, stdout empty" },
+        { "action": "Test CTRL-C symbolic key", "expected": "Exit code 1", "observed": "Exit code 1" },
+        { "action": "Test raw escape format (\\x1b[B)", "expected": "DOWN key processed", "observed": "Raw escape sequence parsed and processed correctly" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group4-sizing/VAL-TUI-031-stdout.txt", "tui-core/group4-sizing/VAL-TUI-031-up-after-down.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-032",
+      "title": "LAB_WIDTH/LAB_HEIGHT override terminal dimensions",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit with LAB_WIDTH=40", "expected": "40-char wide separator", "observed": "Separator line has exactly 40 ─ characters" },
+        { "action": "Run --and-exit with LAB_WIDTH=60", "expected": "60-char wide separator", "observed": "Separator line has exactly 60 ─ characters" },
+        { "action": "Run --and-exit with LAB_WIDTH=100", "expected": "100-char wide separator", "observed": "Separator line has exactly 100 ─ characters" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group4-sizing/VAL-TUI-032-w40.txt", "tui-core/group4-sizing/VAL-TUI-032-w60.txt", "tui-core/group4-sizing/VAL-TUI-032-w100.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-033",
+      "title": "Alternate screen buffer used",
+      "status": "pass",
+      "steps": [
+        { "action": "Launch binary in interactive mode via Python pty module, send ESC to exit", "expected": "Alt screen enter sequence at start, exit sequence at end", "observed": "\\e[?1049h found at byte 0 (start of output). \\e[?1049l found at byte 2986 (near end of 3000 bytes). Confirms TUI enters alt screen on start and restores on exit." },
+        { "action": "Verify from source code", "expected": "ALT_SCREEN_ON/OFF defined and used in TerminalSession", "observed": "ALT_SCREEN_ON = \\x1b[?1049h in TerminalSession::enter(), ALT_SCREEN_OFF = \\x1b[?1049l in Drop impl" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group4-sizing/VAL-TUI-033-pty-output.bin", "tui-core/group4-sizing/VAL-TUI-033-raw.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "--and-keys without --and-exit does not produce any stderr output (TUI frames). To capture rendered frames after key injection, both --and-exit and --and-keys must be combined. This wasn't immediately obvious from the testing docs.",
+      "resolved": true,
+      "resolution": "Used --and-exit --and-keys='...' combination for all frame-capture tests",
+      "affectedAssertions": ["VAL-TUI-019", "VAL-TUI-020"]
+    },
+    {
+      "description": "Alt screen buffer sequences (\\e[?1049h/l) are only emitted in interactive mode, not in --and-exit or --and-keys test modes. Required Python pty module to create a real PTY for testing.",
+      "resolved": true,
+      "resolution": "Used Python pty module to spawn the binary in a pseudo-terminal and capture raw output including alt screen sequences",
+      "affectedAssertions": ["VAL-TUI-033"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 10 assertions: all 10 passed. TUI correctly handles viewport scrolling (VAL-TUI-019), scroll reset on filter change (VAL-TUI-020), standard 80x24 rendering (VAL-TUI-021), narrow terminal degradation with ellipsis (VAL-TUI-022), short terminal with minimum 3 body rows (VAL-TUI-023), long name truncation with … (VAL-TUI-028), --and-exit rendering (VAL-TUI-030), --and-keys injection with symbolic and raw formats (VAL-TUI-031), LAB_WIDTH/LAB_HEIGHT dimension overrides (VAL-TUI-032), and alternate screen buffer usage (VAL-TUI-033)."
+}

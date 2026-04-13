@@ -1,0 +1,144 @@
+{
+  "groupId": "group2-navigation",
+  "testedAt": "2026-04-13T12:05:00Z",
+  "isolation": {
+    "binaryPath": "/Users/js/code/rust/lab/target/debug/lab",
+    "testDir": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/tmp.b4SDaks1DY",
+    "envOverrides": "LAB_WIDTH=80 LAB_HEIGHT=24"
+  },
+  "toolsUsed": ["shell commands (Execute tool)"],
+  "assertions": [
+    {
+      "id": "VAL-TUI-005",
+      "title": "Up/Down arrows move selection",
+      "status": "pass",
+      "steps": [
+        { "action": "Run with --and-keys='DOWN,ENTER'", "expected": "Selects 2nd entry (delta)", "observed": "stdout script targets 2025-04-10-delta (2nd entry)" },
+        { "action": "Run with --and-keys='UP,ENTER'", "expected": "Stays at 1st entry (epsilon)", "observed": "stdout script targets 2025-05-05-epsilon (1st entry, already at top)" },
+        { "action": "Run with --and-keys='DOWN,DOWN,ENTER'", "expected": "Selects 3rd entry (gamma)", "observed": "stdout script targets 2025-03-25-gamma (3rd entry)" },
+        { "action": "Run with --and-keys='CTRL-N,ENTER'", "expected": "Ctrl-N moves down like DOWN, selects delta", "observed": "stdout script targets 2025-04-10-delta" },
+        { "action": "Run with --and-keys='DOWN,CTRL-P,ENTER'", "expected": "Ctrl-P moves up like UP, back to epsilon", "observed": "stdout script targets 2025-05-05-epsilon" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group2-navigation/VAL-TUI-005-down-enter-stderr.txt", "tui-core/group2-navigation/VAL-TUI-005-up-enter-stderr.txt", "tui-core/group2-navigation/VAL-TUI-005-2downs-enter-stderr.txt"],
+        "consoleErrors": "none",
+        "network": "N/A - CLI tool"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-006",
+      "title": "Selection clamps at boundaries",
+      "status": "pass",
+      "steps": [
+        { "action": "Run with --and-keys='UP,UP,UP,UP,UP,UP,UP,UP,UP,UP,ENTER'", "expected": "Clamps at top, selects epsilon", "observed": "stdout script targets 2025-05-05-epsilon (first entry)" },
+        { "action": "Run with --and-keys='DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER'", "expected": "Clamps at bottom, selects alpha", "observed": "stdout script targets 2025-01-15-alpha (last entry)" },
+        { "action": "Run with 50 DOWNs then 50 UPs then ENTER", "expected": "Returns to first entry", "observed": "stdout script targets 2025-05-05-epsilon (first entry)" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group2-navigation/VAL-TUI-006-many-ups-stderr.txt", "tui-core/group2-navigation/VAL-TUI-006-many-downs-stderr.txt", "tui-core/group2-navigation/VAL-TUI-006-bounce-stderr.txt"],
+        "consoleErrors": "none",
+        "network": "N/A - CLI tool"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-008",
+      "title": "Selection resets on query change",
+      "status": "pass",
+      "steps": [
+        { "action": "Run with --and-keys='DOWN,DOWN,a,ENTER'", "expected": "After typing 'a', cursor resets to 0, selects first match for 'a'", "observed": "stdout script targets 2025-01-15-alpha (first match for 'a')" },
+        { "action": "Run with --and-keys='DOWN,DOWN,a' --and-exit, check stderr", "expected": "Arrow → on first filtered result", "observed": "stderr shows → on alpha (first match for 'a'), confirming cursor_pos=0" },
+        { "action": "Run with --and-keys='b,e,t,DOWN,BACKSPACE,ENTER'", "expected": "Backspace changes query, resets cursor to 0", "observed": "stdout targets beta (first match for 'be'), confirming reset on delete" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group2-navigation/VAL-TUI-008-reset-on-type-stderr.txt", "tui-core/group2-navigation/VAL-TUI-008-cursor-reset-visual.txt", "tui-core/group2-navigation/VAL-TUI-008-backspace-reset.txt"],
+        "consoleErrors": "none",
+        "network": "N/A - CLI tool"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-009",
+      "title": "Printable chars insert into search",
+      "status": "pass",
+      "steps": [
+        { "action": "Run with --and-type='hello' --and-exit", "expected": "Search field shows 'hello'", "observed": "Search: hello visible in stderr output" },
+        { "action": "Run with --and-type='test123' --and-exit", "expected": "Alphanumeric chars accepted", "observed": "Search: test123 visible in stderr output" },
+        { "action": "Run with --and-type='a-b_c.d' --and-exit", "expected": "Special chars [-_.] accepted", "observed": "Search: a-b_c.d visible in stderr output" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group2-navigation/VAL-TUI-009-printable-chars.txt", "tui-core/group2-navigation/VAL-TUI-009-alphanumeric.txt", "tui-core/group2-navigation/VAL-TUI-009-special-chars.txt"],
+        "consoleErrors": "none",
+        "network": "N/A - CLI tool"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-010",
+      "title": "Line editing Ctrl-A/E/B/F",
+      "status": "pass",
+      "steps": [
+        { "action": "Type 'abc', Ctrl-A, Ctrl-F, Backspace, --and-exit", "expected": "Cursor at start, forward one, delete 'a' → 'bc'", "observed": "Search field shows 'bc' with cursor on 'b'" },
+        { "action": "Type 'abcd', Ctrl-A, Ctrl-E, Ctrl-B, Backspace, --and-exit", "expected": "To start, to end, back one, delete 'c' → 'abd'", "observed": "Search field shows 'abd' with cursor on 'd'" },
+        { "action": "Type 'xyz', Ctrl-B x3, Ctrl-F, Backspace, --and-exit", "expected": "Back to start, forward one, delete 'x' → 'yz'", "observed": "Search field shows 'yz' with cursor on 'y'" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group2-navigation/VAL-TUI-010-ctrl-a-f.txt", "tui-core/group2-navigation/VAL-TUI-010-ctrl-e-b.txt", "tui-core/group2-navigation/VAL-TUI-010-multi-ctrl-b.txt"],
+        "consoleErrors": "none",
+        "network": "N/A - CLI tool"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-011",
+      "title": "Line editing Ctrl-K/W and Backspace",
+      "status": "pass",
+      "steps": [
+        { "action": "Type 'hello world', Ctrl-A, Ctrl-F x5, Ctrl-K, --and-exit", "expected": "Kill to end removes ' world', leaves 'hello'", "observed": "Search field shows 'hello'" },
+        { "action": "Type 'hello world', Ctrl-W, --and-exit", "expected": "Delete word backward removes 'world', leaves 'hello '", "observed": "Search field shows 'hello '" },
+        { "action": "Type 'abc', Backspace, --and-exit", "expected": "Deletes 'c', leaves 'ab'", "observed": "Search field shows 'ab'" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group2-navigation/VAL-TUI-011-ctrl-k.txt", "tui-core/group2-navigation/VAL-TUI-011-ctrl-w.txt", "tui-core/group2-navigation/VAL-TUI-011-backspace.txt"],
+        "consoleErrors": "none",
+        "network": "N/A - CLI tool"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-012",
+      "title": "Typing filters list in real-time",
+      "status": "pass",
+      "steps": [
+        { "action": "Run with --and-type='bet' --and-exit", "expected": "Only beta entry visible", "observed": "Only 2025-02-20-beta shown (plus Create new option), no other directory entries" },
+        { "action": "Run with --and-type='a' --and-exit", "expected": "Multiple entries containing 'a' visible", "observed": "Shows alpha, gamma, beta, delta (4 entries matching 'a')" },
+        { "action": "Verify 'bet' output has no other directory entries", "expected": "No alpha, gamma, delta, epsilon", "observed": "Confirmed: only beta directory entry plus 'Create new: 2026-04-13-bet'" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group2-navigation/VAL-TUI-012-filter-bet.txt", "tui-core/group2-navigation/VAL-TUI-012-filter-a.txt"],
+        "consoleErrors": "none",
+        "network": "N/A - CLI tool"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-036",
+      "title": "Ctrl-J moves selection down (vim-style)",
+      "status": "pass",
+      "steps": [
+        { "action": "Run with --and-keys='CTRL-J,ENTER'", "expected": "Selects 2nd entry (like DOWN)", "observed": "stdout script targets 2025-04-10-delta (2nd entry), same as DOWN" },
+        { "action": "Run with --and-keys='DOWN,CTRL-J,ENTER'", "expected": "Selects 3rd entry (DOWN + CTRL-J = 2 downs)", "observed": "stdout script targets 2025-03-25-gamma (3rd entry)" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-core/group2-navigation/VAL-TUI-036-ctrlj-down-stderr.txt"],
+        "consoleErrors": "none",
+        "network": "N/A - CLI tool"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 8 assertions: 8 passed, 0 failed. All TUI navigation inputs work correctly — Up/Down arrows, Ctrl-N/P/J move selection, boundaries clamp without wrapping, cursor resets on query change, printable chars insert properly, line editing (Ctrl-A/E/B/F/K/W + Backspace) works as specified, and fuzzy filtering updates in real-time."
+}

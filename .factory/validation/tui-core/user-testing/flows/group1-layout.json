@@ -1,0 +1,133 @@
+{
+  "groupId": "group1-layout",
+  "testedAt": "2026-04-13T12:00:00Z",
+  "isolation": {
+    "binaryPath": "/Users/js/code/rust/lab/target/debug/lab",
+    "testDir": "mktemp -d per assertion",
+    "envOverrides": "LAB_WIDTH=80 LAB_HEIGHT=24"
+  },
+  "toolsUsed": ["shell commands (Execute tool)"],
+  "assertions": [
+    {
+      "id": "VAL-TUI-001",
+      "title": "Header shows title, separator, search input",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit with LAB_WIDTH=80 LAB_HEIGHT=24", "expected": "Header has home icon, title, separator, search label", "observed": "Line 1: 🏠 Lab Directory Selection + path. Line 2: 80 ─ chars. Line 3: Search: with cursor" }
+      ],
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-002",
+      "title": "Footer shows keybinding hints",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit, check last 2 lines of stderr", "expected": "Separator + keybinding hints", "observed": "Second-to-last: ─ separator. Last: ↑/↓: Navigate  Enter: Select  ^R: Rename  ^G: Graduate  ^D: Delete  Esc: Cancel" }
+      ],
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-003",
+      "title": "Body fills remaining space",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit with LAB_HEIGHT=24, count entry lines", "expected": "height - 5 = 19 body rows", "observed": "19 body rows (3 header + 19 body + 2 footer = 24). With LAB_HEIGHT=8: 3 body rows (minimum)" }
+      ],
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-004",
+      "title": "Separator fills terminal width",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit with LAB_WIDTH=80, count ─ chars per separator line", "expected": "80 ─ chars", "observed": "Each separator line has exactly 80 ─ characters" },
+        { "action": "Run --and-exit with LAB_WIDTH=40", "expected": "40 ─ chars", "observed": "Each separator line has exactly 40 ─ characters" }
+      ],
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-007",
+      "title": "First entry selected by default",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit, check for → on first entry", "expected": "→ on first entry line", "observed": "First entry has → prefix with bg highlight. Other entries have plain prefix" }
+      ],
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-025",
+      "title": "Entry shows icon, name, right-aligned metadata",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit, examine entry lines", "expected": "Selection indicator + icon + name + right-aligned timestamp,score", "observed": "Each entry: → or space + 📁 + name + right-aligned dim 'just now, 5.0'" }
+      ],
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-026",
+      "title": "Relative timestamps in correct format",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit with freshly touched entries", "expected": "'just now' format for recent entries", "observed": "All entries show 'just now' (touched within seconds)" }
+      ],
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-027",
+      "title": "Scores display as N.N (one decimal)",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit, check score format", "expected": "Scores like '5.0', '3.2' etc.", "observed": "All scores formatted as N.N (e.g., '5.0')" }
+      ],
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-029",
+      "title": "Selected entry has arrow and background",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit, check ANSI codes on first entry", "expected": "→ prefix with background color ANSI codes", "observed": "First entry: bold yellow → with bg color 238. Non-selected entries have no bg highlight" }
+      ],
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-034",
+      "title": "Hidden directories excluded from listing",
+      "status": "pass",
+      "steps": [
+        { "action": "Create .hidden-dir in test dir, run --and-exit", "expected": "No .hidden in output", "observed": "grep for '.hidden' returns 0 matches" }
+      ],
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-035",
+      "title": "Only directories listed, not files",
+      "status": "pass",
+      "steps": [
+        { "action": "Create regular-file.txt in test dir, run --and-exit", "expected": "No regular-file in output", "observed": "grep for 'regular-file' returns 0 matches" }
+      ],
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-038",
+      "title": "Date prefix dim styling on entries",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit with date-prefixed entries, check ANSI codes", "expected": "Date portion (YYYY-MM-DD-) has dim ANSI code (38;5;245)", "observed": "Date prefix rendered with dim color code 38;5;245. Name portion uses normal style" }
+      ],
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-039",
+      "title": "Header uses lab branding",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit, check header title", "expected": "'Lab Directory Selection' in header", "observed": "Header contains 'Lab Directory Selection'. grep returns 1 match" }
+      ],
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 13 assertions: all 13 passed. TUI layout renders correctly with header (title, separator, search), body (entries with icons, metadata, selection), and footer (keybindings). Hidden dirs excluded, files excluded, date prefixes dim, lab branding correct."
+}

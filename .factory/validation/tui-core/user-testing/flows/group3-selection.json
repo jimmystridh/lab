@@ -1,0 +1,124 @@
+{
+  "groupId": "group3-selection",
+  "testedAt": "2026-04-13T00:00:00Z",
+  "isolation": {
+    "binaryPath": "/Users/js/code/rust/lab/target/debug/lab",
+    "tempDirs": "mktemp -d per assertion",
+    "envOverrides": "LAB_WIDTH=80 LAB_HEIGHT=24"
+  },
+  "toolsUsed": ["shell commands (Execute tool)"],
+  "assertions": [
+    {
+      "id": "VAL-TUI-013",
+      "title": "Enter on directory emits touch-and-cd script",
+      "status": "pass",
+      "steps": [
+        { "action": "Create temp dir with 2025-01-15-alpha and 2025-02-20-beta entries", "expected": "Directories created", "observed": "Directories created" },
+        { "action": "Run lab exec --path $TEST_DIR --and-keys='ENTER'", "expected": "stdout contains warning comment, touch, cd; exit 0", "observed": "stdout: '# if you can read this...' + touch + echo + cd; exit code 0" }
+      ],
+      "evidence": {
+        "stdout": "tui-core/group3-selection/VAL-TUI-013-stdout.txt",
+        "stderr": "tui-core/group3-selection/VAL-TUI-013-stderr.txt",
+        "exitCode": "tui-core/group3-selection/VAL-TUI-013-exitcode.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-014",
+      "title": "ESC and Ctrl-C cancel with exit code 1",
+      "status": "pass",
+      "steps": [
+        { "action": "Create temp dir with 2025-01-15-alpha entry", "expected": "Directory created", "observed": "Directory created" },
+        { "action": "Run lab exec --path $TEST_DIR --and-keys='ESC'", "expected": "Exit code 1, no stdout", "observed": "Exit code 1, stdout empty" },
+        { "action": "Run lab exec --path $TEST_DIR --and-keys='CTRL-C'", "expected": "Exit code 1, no stdout", "observed": "Exit code 1, stdout empty" }
+      ],
+      "evidence": {
+        "results": "tui-core/group3-selection/VAL-TUI-014-results.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-015",
+      "title": "Symlink entries show link icon and resolve to realpath",
+      "status": "pass",
+      "steps": [
+        { "action": "Create temp dir with real-target-dir and symlink 2025-04-01-mylink -> real-target-dir", "expected": "Symlink created", "observed": "Symlink created" },
+        { "action": "Run lab exec --path $TEST_DIR --and-exit and check stderr for 🔗", "expected": "🔗 icon visible in TUI", "observed": "🔗 icon found in TUI output" },
+        { "action": "Run lab exec --path $TEST_DIR --and-keys='ENTER' and check stdout for realpath", "expected": "cd path resolves to /private/.../real-target-dir", "observed": "cd path is /private/.../real-target-dir (realpath)" }
+      ],
+      "evidence": {
+        "stderrDisplay": "tui-core/group3-selection/VAL-TUI-015-stderr-display.txt",
+        "stdout": "tui-core/group3-selection/VAL-TUI-015-stdout.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-016",
+      "title": "Create new appears when input non-empty",
+      "status": "pass",
+      "steps": [
+        { "action": "Create temp dir with 2025-01-15-alpha entry", "expected": "Directory created", "observed": "Directory created" },
+        { "action": "Run lab exec --path $TEST_DIR --and-type=newtest --and-exit", "expected": "stderr contains 📂 icon, 'Create new' text, and YYYY-MM-DD prefix", "observed": "stderr shows '📂 Create new: 2026-04-13-newtest' at end of list" }
+      ],
+      "evidence": {
+        "stderr": "tui-core/group3-selection/VAL-TUI-016-stderr.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-017",
+      "title": "Create new absent when input empty",
+      "status": "pass",
+      "steps": [
+        { "action": "Create temp dir with 2025-01-15-alpha and 2025-02-20-beta entries", "expected": "Directories created", "observed": "Directories created" },
+        { "action": "Run lab exec --path $TEST_DIR --and-exit (empty search)", "expected": "No 📂 icon or 'Create new' in stderr", "observed": "No 📂 icon or 'Create new' text found in output" }
+      ],
+      "evidence": {
+        "stderr": "tui-core/group3-selection/VAL-TUI-017-stderr.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-018",
+      "title": "Selecting create new emits mkdir script",
+      "status": "pass",
+      "steps": [
+        { "action": "Create empty temp dir", "expected": "Directory created", "observed": "Directory created" },
+        { "action": "Run lab exec --path $TEST_DIR --and-type=newproject --and-keys='ENTER'", "expected": "stdout contains mkdir -p with YYYY-MM-DD-newproject, cd, exit 0", "observed": "stdout: mkdir -p .../2026-04-13-newproject + touch + echo + cd; exit 0" }
+      ],
+      "evidence": {
+        "stdout": "tui-core/group3-selection/VAL-TUI-018-stdout.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-037",
+      "title": "Spaces in create name converted to dashes",
+      "status": "pass",
+      "steps": [
+        { "action": "Create empty temp dir", "expected": "Directory created", "observed": "Directory created" },
+        { "action": "Run lab exec --path $TEST_DIR --and-type='my project' --and-keys='ENTER'", "expected": "stdout path has 'my-project' not 'my project'", "observed": "stdout contains .../2026-04-13-my-project; no spaces in path" }
+      ],
+      "evidence": {
+        "stdout": "tui-core/group3-selection/VAL-TUI-037-stdout.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TUI-040",
+      "title": "Create-new in git-backed labs emits worktree script",
+      "status": "pass",
+      "steps": [
+        { "action": "Create temp dir, git init, git commit --allow-empty", "expected": "Git repo initialized with initial commit", "observed": "Git repo initialized successfully" },
+        { "action": "Run lab exec --path $GIT_DIR --and-type=newfeature --and-keys='ENTER'", "expected": "stdout contains 'git worktree add --detach' with dated path", "observed": "stdout contains 'worktree add --detach .../2026-04-13-newfeature' inside sh -c wrapper" }
+      ],
+      "evidence": {
+        "stdout": "tui-core/group3-selection/VAL-TUI-040-stdout.txt"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 8 assertions: 8 passed, 0 failed. All TUI selection and create-new behaviors work as specified."
+}
