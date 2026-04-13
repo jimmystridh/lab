@@ -4,6 +4,7 @@
 //! handling: loaded entries, current filter results, input buffer, selection,
 //! scroll position, mode, delete marks, and terminal size.
 
+use super::dialogs::DeleteConfirmation;
 use crate::{
     entries::Entry,
     fuzzy::{Fuzzy, MatchResult},
@@ -12,7 +13,7 @@ use chrono::Local;
 use crossterm::terminal;
 use std::{
     collections::HashSet,
-    env,
+    env, fs,
     path::{Path, PathBuf},
 };
 
@@ -56,6 +57,8 @@ impl TerminalSize {
 pub enum Mode {
     /// Normal entry-selection mode.
     Normal,
+    /// Delete confirmation dialog.
+    DeleteConfirm,
 }
 
 /// Selection outcome derived from the current cursor position.
@@ -65,6 +68,15 @@ pub enum Selection {
     Existing(PathBuf),
     /// Virtual "create new" row selected.
     Create(PathBuf),
+}
+
+/// Confirmed batch delete selection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeleteSelection {
+    /// Canonical base path containing the marked entries.
+    pub base_path: PathBuf,
+    /// Basenames to delete relative to `base_path`.
+    pub basenames: Vec<String>,
 }
 
 /// Full TUI application state.
@@ -89,6 +101,8 @@ pub struct App {
     pub mode: Mode,
     /// Marked entry indices (used by later delete mode features).
     pub marks: HashSet<usize>,
+    /// Delete confirmation dialog state when active.
+    pub delete_confirmation: Option<DeleteConfirmation>,
     /// Current terminal dimensions.
     pub terminal_size: TerminalSize,
 }
@@ -116,6 +130,7 @@ impl App {
             scroll_offset: 0,
             mode: Mode::Normal,
             marks: HashSet::new(),
+            delete_confirmation: None,
             terminal_size: size,
         };
         app.refresh_filtered();
@@ -168,6 +183,93 @@ impl App {
             .map(|name| Selection::Create(self.labs_path.join(name)))
     }
 
+    /// Return the selected real entry index, if the cursor is on an entry row.
+    pub fn current_entry_index(&self) -> Option<usize> {
+        if self.cursor_pos < self.filtered.len() {
+            Some(self.filtered[self.cursor_pos].index)
+        } else {
+            None
+        }
+    }
+
+    /// Whether delete mode is active because at least one entry is marked.
+    pub fn is_delete_mode(&self) -> bool {
+        !self.marks.is_empty() && self.mode == Mode::Normal
+    }
+
+    /// Whether the delete confirmation dialog is active.
+    pub fn is_confirming_delete(&self) -> bool {
+        self.mode == Mode::DeleteConfirm
+    }
+
+    /// Return the number of marked entries.
+    pub fn marked_count(&self) -> usize {
+        self.marks.len()
+    }
+
+    /// Return the marked entries in their current visible order.
+    pub fn marked_entries(&self) -> Vec<&Entry> {
+        self.ordered_marked_entry_indices()
+            .into_iter()
+            .filter_map(|index| self.entries.get(index))
+            .collect()
+    }
+
+    /// Toggle the delete mark on the currently selected entry.
+    pub fn toggle_delete_mark(&mut self) {
+        let Some(index) = self.current_entry_index() else {
+            return;
+        };
+
+        if !self.marks.insert(index) {
+            self.marks.remove(&index);
+        }
+
+        self.mode = Mode::Normal;
+        self.delete_confirmation = None;
+    }
+
+    /// Clear all delete marks and close any active delete confirmation dialog.
+    pub fn clear_delete_marks(&mut self) {
+        self.marks.clear();
+        self.mode = Mode::Normal;
+        self.delete_confirmation = None;
+    }
+
+    /// Enter the delete confirmation dialog when marks are present.
+    pub fn begin_delete_confirmation(&mut self) {
+        if self.marks.is_empty() {
+            return;
+        }
+
+        self.mode = Mode::DeleteConfirm;
+        self.delete_confirmation = Some(DeleteConfirmation::new());
+    }
+
+    /// Submit the delete confirmation dialog.
+    ///
+    /// Returns a validated delete selection when the input exactly matches `YES`.
+    /// Any other input cancels delete mode and clears marks.
+    pub fn submit_delete_confirmation(&mut self) -> Option<DeleteSelection> {
+        if !self.is_confirming_delete() {
+            return None;
+        }
+
+        let confirmed = self
+            .delete_confirmation
+            .as_ref()
+            .is_some_and(DeleteConfirmation::is_confirmed);
+        let marked_indices = self.ordered_marked_entry_indices();
+        let selection = if confirmed {
+            self.build_delete_selection(&marked_indices)
+        } else {
+            None
+        };
+
+        self.clear_delete_marks();
+        selection
+    }
+
     /// Move the selection down one row, clamped at the end.
     pub fn move_down(&mut self) {
         let total = self.total_items();
@@ -214,6 +316,13 @@ impl App {
 
     /// Insert a printable character into the input buffer.
     pub fn insert_char(&mut self, character: char) {
+        if self.is_confirming_delete() {
+            if let Some(dialog) = self.delete_confirmation.as_mut() {
+                dialog.insert_char(character);
+            }
+            return;
+        }
+
         if !is_allowed_input_char(character) {
             return;
         }
@@ -226,6 +335,13 @@ impl App {
 
     /// Delete the character before the input cursor.
     pub fn backspace(&mut self) {
+        if self.is_confirming_delete() {
+            if let Some(dialog) = self.delete_confirmation.as_mut() {
+                dialog.backspace();
+            }
+            return;
+        }
+
         if self.input_cursor_pos == 0 {
             return;
         }
@@ -238,26 +354,61 @@ impl App {
 
     /// Move the input cursor to the start.
     pub fn move_input_to_start(&mut self) {
+        if self.is_confirming_delete() {
+            if let Some(dialog) = self.delete_confirmation.as_mut() {
+                dialog.move_to_start();
+            }
+            return;
+        }
+
         self.input_cursor_pos = 0;
     }
 
     /// Move the input cursor to the end.
     pub fn move_input_to_end(&mut self) {
+        if self.is_confirming_delete() {
+            if let Some(dialog) = self.delete_confirmation.as_mut() {
+                dialog.move_to_end();
+            }
+            return;
+        }
+
         self.input_cursor_pos = self.input.chars().count();
     }
 
     /// Move the input cursor back one character.
     pub fn move_input_back(&mut self) {
+        if self.is_confirming_delete() {
+            if let Some(dialog) = self.delete_confirmation.as_mut() {
+                dialog.move_back();
+            }
+            return;
+        }
+
         self.input_cursor_pos = self.input_cursor_pos.saturating_sub(1);
     }
 
     /// Move the input cursor forward one character.
     pub fn move_input_forward(&mut self) {
+        if self.is_confirming_delete() {
+            if let Some(dialog) = self.delete_confirmation.as_mut() {
+                dialog.move_forward();
+            }
+            return;
+        }
+
         self.input_cursor_pos = (self.input_cursor_pos + 1).min(self.input.chars().count());
     }
 
     /// Delete from the input cursor to the end of the line.
     pub fn kill_to_end(&mut self) {
+        if self.is_confirming_delete() {
+            if let Some(dialog) = self.delete_confirmation.as_mut() {
+                dialog.kill_to_end();
+            }
+            return;
+        }
+
         let byte_pos = self.char_to_byte_pos(self.input_cursor_pos);
         if byte_pos >= self.input.len() {
             return;
@@ -269,6 +420,13 @@ impl App {
 
     /// Delete the previous word from the input buffer.
     pub fn delete_word_backward(&mut self) {
+        if self.is_confirming_delete() {
+            if let Some(dialog) = self.delete_confirmation.as_mut() {
+                dialog.delete_word_backward();
+            }
+            return;
+        }
+
         if self.input_cursor_pos == 0 {
             return;
         }
@@ -323,6 +481,55 @@ impl App {
         }
     }
 
+    fn build_delete_selection(&self, marked_indices: &[usize]) -> Option<DeleteSelection> {
+        if marked_indices.is_empty() {
+            return None;
+        }
+
+        let base_path = fs::canonicalize(&self.labs_path).ok()?;
+        let mut basenames = Vec::with_capacity(marked_indices.len());
+
+        for &index in marked_indices {
+            let entry = self.entries.get(index)?;
+            let target_real = fs::canonicalize(&entry.path).ok()?;
+            if target_real == base_path || !target_real.starts_with(&base_path) {
+                return None;
+            }
+
+            basenames.push(entry.name.clone());
+        }
+
+        Some(DeleteSelection {
+            base_path,
+            basenames,
+        })
+    }
+
+    fn ordered_marked_entry_indices(&self) -> Vec<usize> {
+        let mut ordered = Vec::with_capacity(self.marks.len());
+        let mut seen = HashSet::with_capacity(self.marks.len());
+
+        for result in &self.filtered {
+            if self.marks.contains(&result.index) {
+                ordered.push(result.index);
+                seen.insert(result.index);
+            }
+        }
+
+        let mut remaining = self
+            .marks
+            .iter()
+            .copied()
+            .filter(|index| !seen.contains(index))
+            .collect::<Vec<_>>();
+        remaining.sort_unstable_by(|left, right| {
+            self.entries[*left].name.cmp(&self.entries[*right].name)
+        });
+        ordered.extend(remaining);
+
+        ordered
+    }
+
     fn char_to_byte_pos(&self, char_pos: usize) -> usize {
         self.input
             .char_indices()
@@ -365,7 +572,7 @@ fn resolve_dimension(override_value: Option<&str>, detected: u16, default: u16) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{path::PathBuf, time::SystemTime};
+    use std::{fs, path::PathBuf, time::SystemTime};
 
     fn make_entry(name: &str, score: f64) -> Entry {
         Entry {
@@ -613,5 +820,98 @@ mod tests {
         assert!(app.input.is_empty());
         assert_eq!(app.cursor_pos, 0);
         assert_eq!(app.scroll_offset, 0);
+    }
+
+    #[test]
+    fn test_toggle_delete_mark_marks_and_unmarks_current_entry() {
+        let mut app = make_app(None);
+
+        app.move_down();
+        app.toggle_delete_mark();
+        assert_eq!(app.marks, HashSet::from([1]));
+        assert!(app.is_delete_mode());
+
+        app.toggle_delete_mark();
+        assert!(app.marks.is_empty());
+        assert_eq!(app.mode, Mode::Normal);
+    }
+
+    #[test]
+    fn test_begin_delete_confirmation_and_submit_yes_returns_selection() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::create_dir(dir.path().join("alpha")).expect("mkdir alpha");
+        let entry = Entry {
+            name: "alpha".to_string(),
+            path: dir.path().join("alpha"),
+            is_symlink: false,
+            mtime: SystemTime::now(),
+            base_score: 1.0,
+        };
+        let mut app = App::new(dir.path(), vec![entry], None, TerminalSize::new(80, 24));
+
+        app.toggle_delete_mark();
+        app.begin_delete_confirmation();
+        assert!(app.is_confirming_delete());
+
+        for character in ['Y', 'E', 'S'] {
+            app.insert_char(character);
+        }
+
+        let selection = app.submit_delete_confirmation().expect("delete selection");
+        assert_eq!(
+            selection.base_path,
+            fs::canonicalize(dir.path()).expect("base realpath")
+        );
+        assert_eq!(selection.basenames, vec!["alpha".to_string()]);
+        assert!(app.marks.is_empty());
+        assert_eq!(app.mode, Mode::Normal);
+    }
+
+    #[test]
+    fn test_submit_delete_confirmation_non_yes_cancels_and_clears_marks() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::create_dir(dir.path().join("alpha")).expect("mkdir alpha");
+        let entry = Entry {
+            name: "alpha".to_string(),
+            path: dir.path().join("alpha"),
+            is_symlink: false,
+            mtime: SystemTime::now(),
+            base_score: 1.0,
+        };
+        let mut app = App::new(dir.path(), vec![entry], None, TerminalSize::new(80, 24));
+
+        app.toggle_delete_mark();
+        app.begin_delete_confirmation();
+        for character in ['y', 'e', 's'] {
+            app.insert_char(character);
+        }
+
+        assert!(app.submit_delete_confirmation().is_none());
+        assert!(app.marks.is_empty());
+        assert_eq!(app.mode, Mode::Normal);
+    }
+
+    #[test]
+    fn test_submit_delete_confirmation_rejects_targets_outside_base_path() {
+        let base = tempfile::tempdir().expect("base tempdir");
+        let outside = tempfile::tempdir().expect("outside tempdir");
+        let entry = Entry {
+            name: "outside-link".to_string(),
+            path: outside.path().to_path_buf(),
+            is_symlink: true,
+            mtime: SystemTime::now(),
+            base_score: 1.0,
+        };
+        let mut app = App::new(base.path(), vec![entry], None, TerminalSize::new(80, 24));
+
+        app.toggle_delete_mark();
+        app.begin_delete_confirmation();
+        for character in ['Y', 'E', 'S'] {
+            app.insert_char(character);
+        }
+
+        assert!(app.submit_delete_confirmation().is_none());
+        assert!(app.marks.is_empty());
+        assert_eq!(app.mode, Mode::Normal);
     }
 }

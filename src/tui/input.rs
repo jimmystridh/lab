@@ -13,9 +13,27 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Handle a single key event for the selector.
 pub fn handle_key(app: &mut App, key: KeyEvent) -> Option<TuiOutcome> {
+    if app.is_confirming_delete() {
+        return handle_delete_confirmation_key(app, key);
+    }
+
     match key.code {
-        KeyCode::Enter => Some(selection_outcome(app.current_selection())),
-        KeyCode::Esc => Some(TuiOutcome::Cancelled),
+        KeyCode::Enter => {
+            if app.is_delete_mode() {
+                app.begin_delete_confirmation();
+                None
+            } else {
+                Some(selection_outcome(app.current_selection()))
+            }
+        }
+        KeyCode::Esc => {
+            if app.is_delete_mode() {
+                app.clear_delete_marks();
+                None
+            } else {
+                Some(TuiOutcome::Cancelled)
+            }
+        }
         KeyCode::Backspace => {
             app.backspace();
             None
@@ -55,6 +73,44 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Option<TuiOutcome> {
     }
 }
 
+fn handle_delete_confirmation_key(app: &mut App, key: KeyEvent) -> Option<TuiOutcome> {
+    match key.code {
+        KeyCode::Enter => app.submit_delete_confirmation().map(TuiOutcome::Delete),
+        KeyCode::Esc => {
+            app.clear_delete_marks();
+            None
+        }
+        KeyCode::Backspace => {
+            app.backspace();
+            None
+        }
+        KeyCode::Left => {
+            app.move_input_back();
+            None
+        }
+        KeyCode::Right => {
+            app.move_input_forward();
+            None
+        }
+        KeyCode::Home => {
+            app.move_input_to_start();
+            None
+        }
+        KeyCode::End => {
+            app.move_input_to_end();
+            None
+        }
+        KeyCode::Char(character) if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            handle_delete_confirmation_control_key(app, character)
+        }
+        KeyCode::Char(character) => {
+            app.insert_char(character);
+            None
+        }
+        _ => None,
+    }
+}
+
 fn handle_control_key(app: &mut App, character: char) -> Option<TuiOutcome> {
     match character.to_ascii_lowercase() {
         'a' => {
@@ -65,7 +121,18 @@ fn handle_control_key(app: &mut App, character: char) -> Option<TuiOutcome> {
             app.move_input_back();
             None
         }
-        'c' => Some(TuiOutcome::Cancelled),
+        'c' => {
+            if app.is_delete_mode() {
+                app.clear_delete_marks();
+                None
+            } else {
+                Some(TuiOutcome::Cancelled)
+            }
+        }
+        'd' => {
+            app.toggle_delete_mark();
+            None
+        }
         'e' => {
             app.move_input_to_end();
             None
@@ -98,6 +165,44 @@ fn handle_control_key(app: &mut App, character: char) -> Option<TuiOutcome> {
     }
 }
 
+fn handle_delete_confirmation_control_key(app: &mut App, character: char) -> Option<TuiOutcome> {
+    match character.to_ascii_lowercase() {
+        'a' => {
+            app.move_input_to_start();
+            None
+        }
+        'b' => {
+            app.move_input_back();
+            None
+        }
+        'c' => {
+            app.clear_delete_marks();
+            None
+        }
+        'e' => {
+            app.move_input_to_end();
+            None
+        }
+        'f' => {
+            app.move_input_forward();
+            None
+        }
+        'h' => {
+            app.backspace();
+            None
+        }
+        'k' => {
+            app.kill_to_end();
+            None
+        }
+        'w' => {
+            app.delete_word_backward();
+            None
+        }
+        _ => None,
+    }
+}
+
 fn selection_outcome(selection: Option<Selection>) -> TuiOutcome {
     match selection {
         Some(Selection::Existing(path)) => TuiOutcome::Selected(path),
@@ -110,7 +215,7 @@ fn selection_outcome(selection: Option<Selection>) -> TuiOutcome {
 mod tests {
     use super::*;
     use crate::{entries::Entry, tui::app::TerminalSize};
-    use std::{path::PathBuf, time::SystemTime};
+    use std::{fs, path::PathBuf, time::SystemTime};
 
     fn make_entry(name: &str, score: f64) -> Entry {
         Entry {
@@ -148,6 +253,36 @@ mod tests {
                 .collect(),
             None,
             TerminalSize::new(80, height),
+        )
+    }
+
+    fn make_delete_ready_app() -> App {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let labs_path = dir.path().to_path_buf();
+        fs::create_dir(labs_path.join("alpha")).expect("mkdir alpha");
+        fs::create_dir(labs_path.join("beta")).expect("mkdir beta");
+        std::mem::forget(dir);
+
+        App::new(
+            &labs_path,
+            vec![
+                Entry {
+                    name: "alpha".to_string(),
+                    path: labs_path.join("alpha"),
+                    is_symlink: false,
+                    mtime: SystemTime::now(),
+                    base_score: 2.0,
+                },
+                Entry {
+                    name: "beta".to_string(),
+                    path: labs_path.join("beta"),
+                    is_symlink: false,
+                    mtime: SystemTime::now(),
+                    base_score: 1.0,
+                },
+            ],
+            None,
+            TerminalSize::new(80, 24),
         )
     }
 
@@ -230,6 +365,136 @@ mod tests {
         );
 
         assert_eq!(outcome, Some(TuiOutcome::Cancelled));
+    }
+
+    #[test]
+    fn test_ctrl_d_toggles_delete_mark_on_current_entry() {
+        let mut app = make_app(None);
+
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert_eq!(app.marks.len(), 1);
+        assert!(app.marks.contains(&0));
+
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert!(app.marks.is_empty());
+    }
+
+    #[test]
+    fn test_ctrl_d_on_create_new_row_does_nothing() {
+        let mut app = App::new(
+            "/tmp/labs",
+            Vec::new(),
+            Some("new project"),
+            TerminalSize::new(80, 24),
+        );
+
+        assert_eq!(app.total_items(), 1);
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert!(app.marks.is_empty());
+    }
+
+    #[test]
+    fn test_escape_in_delete_mode_clears_marks_without_exiting_immediately() {
+        let mut app = make_app(None);
+        app.toggle_delete_mark();
+
+        let outcome = handle_key(&mut app, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+
+        assert!(outcome.is_none());
+        assert!(app.marks.is_empty());
+        assert!(!app.is_delete_mode());
+    }
+
+    #[test]
+    fn test_enter_in_delete_mode_opens_confirmation_and_yes_returns_delete_outcome() {
+        let mut app = make_delete_ready_app();
+
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert!(handle_key(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)).is_none());
+        assert!(app.is_confirming_delete());
+
+        for character in ['Y', 'E', 'S'] {
+            assert!(handle_key(
+                &mut app,
+                KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE),
+            )
+            .is_none());
+        }
+
+        let outcome = handle_key(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert_eq!(
+            outcome,
+            Some(TuiOutcome::Delete(crate::tui::app::DeleteSelection {
+                base_path: fs::canonicalize(&app.labs_path).expect("base realpath"),
+                basenames: vec!["alpha".to_string()],
+            }))
+        );
+    }
+
+    #[test]
+    fn test_delete_confirmation_line_editing_uses_ctrl_bindings() {
+        let mut app = make_delete_ready_app();
+        app.toggle_delete_mark();
+        app.begin_delete_confirmation();
+
+        for character in "YEXX".chars() {
+            assert!(handle_key(
+                &mut app,
+                KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE),
+            )
+            .is_none());
+        }
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('k'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+
+        if let Some(dialog) = app.delete_confirmation.as_ref() {
+            assert_eq!(dialog.input, "Y");
+            assert_eq!(dialog.cursor_pos, 1);
+        } else {
+            panic!("delete confirmation should remain active");
+        }
+    }
+
+    #[test]
+    fn test_escape_in_delete_confirmation_clears_marks_and_stays_in_selector() {
+        let mut app = make_app(None);
+        app.toggle_delete_mark();
+        app.begin_delete_confirmation();
+
+        let outcome = handle_key(&mut app, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+
+        assert!(outcome.is_none());
+        assert!(app.marks.is_empty());
+        assert!(!app.is_confirming_delete());
     }
 
     #[test]

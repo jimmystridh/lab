@@ -57,6 +57,7 @@ enum Background {
     #[default]
     None,
     Selected,
+    Danger,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -113,6 +114,10 @@ impl SegmentStyleSpec {
         }
     }
 
+    const fn bold(self) -> Self {
+        Self { bold: true, ..self }
+    }
+
     const fn with_background(self, bg: Background) -> Self {
         Self { bg, ..self }
     }
@@ -144,6 +149,7 @@ impl SegmentStyleSpec {
         match self.bg {
             Background::None => style,
             Background::Selected => style.bg(Color::Indexed(238)),
+            Background::Danger => style.bg(Color::Indexed(52)),
         }
     }
 
@@ -170,6 +176,7 @@ impl SegmentStyleSpec {
         match self.bg {
             Background::None => {}
             Background::Selected => codes.push("48;5;238"),
+            Background::Danger => codes.push("48;5;52"),
         }
 
         format!("\x1b[{}m", codes.join(";"))
@@ -242,6 +249,10 @@ fn render_snapshot_with_colors(app: &App, width: u16, height: u16, colors_enable
 }
 
 fn build_lines(app: &App, width: u16, height: u16) -> Vec<StyledLine> {
+    if app.is_confirming_delete() {
+        return build_delete_confirmation_lines(app, width, height);
+    }
+
     let body_rows = body_height(height);
     let mut lines = Vec::with_capacity(body_rows + 5);
 
@@ -250,11 +261,7 @@ fn build_lines(app: &App, width: u16, height: u16) -> Vec<StyledLine> {
     lines.push(build_search_line(app, width));
     lines.extend(build_body_lines(app, width, body_rows));
     lines.push(separator_line(width));
-    lines.push(centered_line(
-        width,
-        FOOTER_HINTS,
-        SegmentStyleSpec::muted(),
-    ));
+    lines.push(build_footer_line(app, width));
 
     lines
 }
@@ -289,7 +296,7 @@ fn build_body_lines(app: &App, width: u16, body_rows: usize) -> Vec<StyledLine> 
         let line = if list_index < app.filtered.len() {
             let result = &app.filtered[list_index];
             let entry = &app.entries[result.index];
-            build_entry_line(entry, result, list_index == app.cursor_pos, width)
+            build_entry_line(app, entry, result, list_index == app.cursor_pos, width)
         } else if app.show_create_new() && list_index == app.filtered.len() {
             build_create_line(app, list_index == app.cursor_pos, width)
         } else {
@@ -302,8 +309,17 @@ fn build_body_lines(app: &App, width: u16, body_rows: usize) -> Vec<StyledLine> 
     lines
 }
 
-fn build_entry_line(entry: &Entry, result: &MatchResult, selected: bool, width: u16) -> StyledLine {
-    let background = if selected {
+fn build_entry_line(
+    app: &App,
+    entry: &Entry,
+    result: &MatchResult,
+    selected: bool,
+    width: u16,
+) -> StyledLine {
+    let marked = app.marks.contains(&result.index);
+    let background = if marked {
+        Background::Danger
+    } else if selected {
         Background::Selected
     } else {
         Background::None
@@ -318,7 +334,16 @@ fn build_entry_line(entry: &Entry, result: &MatchResult, selected: bool, width: 
 
     let mut left = vec![
         StyledSegment::new(if selected { "→ " } else { "  " }, prefix_style),
-        StyledSegment::new(if entry.is_symlink { "🔗" } else { "📁" }, line_fill),
+        StyledSegment::new(
+            if marked {
+                "🗑️"
+            } else if entry.is_symlink {
+                "🔗"
+            } else {
+                "📁"
+            },
+            line_fill,
+        ),
         StyledSegment::new(" ", line_fill),
     ];
 
@@ -344,6 +369,97 @@ fn build_entry_line(entry: &Entry, result: &MatchResult, selected: bool, width: 
     );
 
     compose_left_right(width, left, Some(metadata), background)
+}
+
+fn build_footer_line(app: &App, width: u16) -> StyledLine {
+    if app.is_delete_mode() {
+        let text = format!(
+            "DELETE MODE | {} marked | Ctrl-D: Toggle | Enter: Confirm | Esc: Cancel",
+            app.marked_count()
+        );
+        centered_segments_line(
+            width,
+            vec![StyledSegment::new(
+                text,
+                SegmentStyleSpec::normal()
+                    .bold()
+                    .with_background(Background::Danger),
+            )],
+            Background::Danger,
+        )
+    } else {
+        centered_line(width, FOOTER_HINTS, SegmentStyleSpec::muted())
+    }
+}
+
+fn build_delete_confirmation_lines(app: &App, width: u16, height: u16) -> Vec<StyledLine> {
+    let body_rows = dialog_body_height(height);
+    let count = app.marked_count();
+    let noun = if count == 1 {
+        "directory"
+    } else {
+        "directories"
+    };
+    let marked_entries = app.marked_entries();
+    let prompt_row = body_rows.saturating_sub(1);
+    let visible_items = marked_entries.len().min(prompt_row);
+    let mut lines = Vec::with_capacity(body_rows + 4);
+
+    lines.push(centered_segments_line(
+        width,
+        vec![
+            StyledSegment::new("🗑️", SegmentStyleSpec::normal()),
+            StyledSegment::new(
+                format!(" Delete {count} {noun}?"),
+                SegmentStyleSpec::accent(),
+            ),
+        ],
+        Background::None,
+    ));
+    lines.push(separator_line(width));
+
+    for entry in marked_entries.iter().take(visible_items) {
+        lines.push(build_delete_dialog_item_line(&entry.name, width));
+    }
+    while lines.len() < 2 + prompt_row {
+        lines.push(blank_line(width, Background::None));
+    }
+    lines.push(build_delete_prompt_line(app, width));
+
+    lines.push(separator_line(width));
+    lines.push(centered_line(
+        width,
+        "Enter: Confirm  Esc: Cancel",
+        SegmentStyleSpec::muted(),
+    ));
+
+    lines
+}
+
+fn build_delete_dialog_item_line(name: &str, width: u16) -> StyledLine {
+    fill_line(
+        width,
+        vec![
+            StyledSegment::new("🗑️", fill_style(Background::Danger)),
+            StyledSegment::new(" ", fill_style(Background::Danger)),
+            StyledSegment::new(name, fill_style(Background::Danger)),
+        ],
+        Background::Danger,
+    )
+}
+
+fn build_delete_prompt_line(app: &App, width: u16) -> StyledLine {
+    let dialog = app.delete_confirmation.as_ref();
+    let input = dialog
+        .map(|dialog| dialog.input.as_str())
+        .unwrap_or_default();
+    let cursor_pos = dialog.map(|dialog| dialog.cursor_pos).unwrap_or(0);
+    let mut segments = vec![StyledSegment::new(
+        "Type YES to confirm: ",
+        SegmentStyleSpec::muted(),
+    )];
+    segments.extend(input_segments(input, cursor_pos));
+    centered_segments_line(width, segments, Background::None)
 }
 
 fn build_create_line(app: &App, selected: bool, width: u16) -> StyledLine {
@@ -386,16 +502,28 @@ fn separator_line(width: u16) -> StyledLine {
 }
 
 fn centered_line(width: u16, text: &str, style: SegmentStyleSpec) -> StyledLine {
+    centered_segments_line(
+        width,
+        vec![StyledSegment::new(text, style)],
+        Background::None,
+    )
+}
+
+fn centered_segments_line(
+    width: u16,
+    segments: Vec<StyledSegment>,
+    background: Background,
+) -> StyledLine {
     let width = usize::from(width);
-    let content = truncate_segments(&[StyledSegment::new(text, style)], width);
+    let content = truncate_segments(&segments, width);
     let content_width = segments_width(&content);
     let left_padding = width.saturating_sub(content_width) / 2;
     let right_padding = width.saturating_sub(content_width + left_padding);
 
     let mut segments = Vec::new();
-    append_spaces(&mut segments, left_padding, fill_style(Background::None));
+    append_spaces(&mut segments, left_padding, fill_style(background));
     extend_segments(&mut segments, content);
-    append_spaces(&mut segments, right_padding, fill_style(Background::None));
+    append_spaces(&mut segments, right_padding, fill_style(background));
 
     StyledLine { segments }
 }
@@ -722,6 +850,10 @@ fn body_height(height: u16) -> usize {
     usize::from(height.saturating_sub(5)).max(3)
 }
 
+fn dialog_body_height(height: u16) -> usize {
+    usize::from(height.saturating_sub(4)).max(3)
+}
+
 fn format_relative_time(mtime: SystemTime) -> String {
     let elapsed = SystemTime::now().duration_since(mtime).unwrap_or_default();
     let seconds = elapsed.as_secs();
@@ -871,6 +1003,94 @@ mod tests {
 
         let rendered = snapshot(&app, false);
         assert!(rendered.lines().nth(3).unwrap_or_default().contains("🔗"));
+    }
+
+    #[test]
+    fn test_delete_mode_footer_uses_danger_background_and_mark_count() {
+        let mut app = make_app(
+            vec![make_entry("alpha", false, SystemTime::now())],
+            80,
+            8,
+            None,
+        );
+        app.filtered = vec![MatchResult {
+            index: 0,
+            score: 3.0,
+            positions: Vec::new(),
+        }];
+        app.marks.insert(0);
+
+        let rendered = snapshot(&app, true);
+        let footer = rendered.lines().nth(7).expect("footer line");
+
+        assert!(footer
+            .contains("DELETE MODE | 1 marked | Ctrl-D: Toggle | Enter: Confirm | Esc: Cancel"));
+        assert!(footer.contains("\x1b[1;48;5;52m"));
+    }
+
+    #[test]
+    fn test_marked_entry_uses_trash_icon_and_danger_background() {
+        let mut app = make_app(
+            vec![make_entry("2025-11-29-project", false, SystemTime::now())],
+            80,
+            8,
+            None,
+        );
+        app.filtered = vec![MatchResult {
+            index: 0,
+            score: 3.0,
+            positions: Vec::new(),
+        }];
+        app.marks.insert(0);
+
+        let rendered = snapshot(&app, true);
+        let line = rendered.lines().nth(3).expect("entry line");
+
+        assert!(line.contains("🗑️"));
+        assert!(line.contains("\x1b[48;5;52m"));
+    }
+
+    #[test]
+    fn test_delete_confirmation_dialog_renders_marked_names_and_prompt() {
+        let mut app = make_app(
+            vec![
+                make_entry("alpha", false, SystemTime::now()),
+                make_entry("beta", false, SystemTime::now()),
+            ],
+            80,
+            8,
+            None,
+        );
+        app.filtered = vec![
+            MatchResult {
+                index: 0,
+                score: 3.0,
+                positions: Vec::new(),
+            },
+            MatchResult {
+                index: 1,
+                score: 2.0,
+                positions: Vec::new(),
+            },
+        ];
+        app.marks.insert(0);
+        app.marks.insert(1);
+        app.begin_delete_confirmation();
+        if let Some(dialog) = app.delete_confirmation.as_mut() {
+            dialog.input = "YES".to_string();
+            dialog.cursor_pos = 3;
+        }
+
+        let rendered = snapshot(&app, true);
+        let lines = rendered.lines().collect::<Vec<_>>();
+
+        assert!(lines[0].contains("Delete 2 directories?"));
+        assert!(lines.iter().any(|line| line.contains("🗑️ alpha")));
+        assert!(lines.iter().any(|line| line.contains("🗑️ beta")));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("Type YES to confirm: ")));
+        assert!(rendered.contains("YES\x1b[7m \x1b[0m"));
     }
 
     #[test]

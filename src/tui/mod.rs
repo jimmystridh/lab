@@ -4,12 +4,13 @@
 //! Rendering is always sent to stderr, while scripts remain on stdout.
 
 pub mod app;
+pub mod dialogs;
 pub mod input;
 pub mod render;
 pub mod test_keys;
 
 use self::{
-    app::{App, TerminalSize},
+    app::{App, DeleteSelection, TerminalSize},
     input::handle_key,
     test_keys::TestKeySource,
 };
@@ -41,6 +42,8 @@ pub enum TuiOutcome {
     Selected(PathBuf),
     /// Virtual create-new entry selected.
     Create(PathBuf),
+    /// Marked entries confirmed for deletion.
+    Delete(DeleteSelection),
     /// Selector cancelled without emitting a shell script.
     Cancelled,
 }

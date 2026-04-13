@@ -67,6 +67,10 @@ fn commands_for_outcome(outcome: &TuiOutcome, labs_path: &Path) -> Option<Vec<St
             Some(script::script_cd(&path))
         }
         TuiOutcome::Create(path) => Some(create_commands(path, labs_path)),
+        TuiOutcome::Delete(selection) => Some(script::script_delete(
+            &selection.base_path.to_string_lossy(),
+            &selection.basenames,
+        )),
         TuiOutcome::Cancelled => None,
     }
 }
@@ -236,5 +240,30 @@ mod tests {
             "git -C '{}' rev-parse --show-toplevel",
             dir.path().to_string_lossy()
         )));
+    }
+
+    #[test]
+    fn test_delete_outcome_uses_batch_delete_script() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let commands = commands_for_outcome(
+            &TuiOutcome::Delete(crate::tui::app::DeleteSelection {
+                base_path: dir.path().to_path_buf(),
+                basenames: vec!["alpha".to_string(), "beta".to_string()],
+            }),
+            dir.path(),
+        )
+        .expect("delete commands");
+
+        assert_eq!(
+            commands[0],
+            format!("cd '{}'", dir.path().to_string_lossy())
+        );
+        assert_eq!(commands[1], "test -d 'alpha' && rm -rf 'alpha'");
+        assert_eq!(commands[2], "test -d 'beta' && rm -rf 'beta'");
+        assert!(
+            commands[3].ends_with(&format!("|| cd '{}'", dir.path().to_string_lossy())),
+            "expected restore command to fall back to labs path, got {:?}",
+            commands[3]
+        );
     }
 }

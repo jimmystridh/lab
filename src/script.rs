@@ -128,6 +128,30 @@ pub fn script_worktree(path: &str, repo: Option<&str>) -> Vec<String> {
     cmds
 }
 
+/// Build commands for batch-deleting marked entries inside the labs directory.
+///
+/// The script first changes into the canonical labs base path, deletes each
+/// marked basename with a `test -d` safety guard, then attempts to restore the
+/// original working directory and falls back to the labs base if that no longer
+/// exists.
+pub fn script_delete(base_path: &str, basenames: &[String]) -> Vec<String> {
+    let original_pwd = env::current_dir()
+        .map(|path| path.to_string_lossy().to_string())
+        .unwrap_or_else(|_| base_path.to_string());
+
+    let mut cmds = vec![format!("cd {}", quote_path(base_path))];
+    for basename in basenames {
+        let quoted = quote_path(basename);
+        cmds.push(format!("test -d {quoted} && rm -rf {quoted}"));
+    }
+    cmds.push(format!(
+        "cd {} 2>/dev/null || cd {}",
+        quote_path(&original_pwd),
+        quote_path(base_path)
+    ));
+    cmds
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -512,6 +536,48 @@ mod tests {
             target.join(".git").is_file(),
             "expected linked worktree .git file"
         );
+    }
+
+    #[test]
+    fn test_script_delete_uses_basenames_only_and_restores_pwd() {
+        let cwd = env::current_dir()
+            .map(|path| path.to_string_lossy().to_string())
+            .expect("current dir");
+        let cmds = script_delete(
+            "/tmp/labs",
+            &[
+                "2025-11-01-first".to_string(),
+                "2025-11-02-second".to_string(),
+            ],
+        );
+
+        assert_eq!(cmds[0], "cd '/tmp/labs'");
+        assert_eq!(
+            cmds[1],
+            "test -d '2025-11-01-first' && rm -rf '2025-11-01-first'"
+        );
+        assert_eq!(
+            cmds[2],
+            "test -d '2025-11-02-second' && rm -rf '2025-11-02-second'"
+        );
+        assert_eq!(
+            cmds[3],
+            format!("cd '{}' 2>/dev/null || cd '/tmp/labs'", cwd)
+        );
+        assert!(cmds.iter().all(|cmd| !cmd.contains("/tmp/labs/2025-11")));
+    }
+
+    #[test]
+    fn test_delete_script_full_output() {
+        let cmds = script_delete("/tmp/labs", &["project".to_string()]);
+        let output = capture_emit_script(&cmds);
+        let lines: Vec<&str> = output.lines().collect();
+
+        assert_eq!(lines[0], SCRIPT_WARNING);
+        assert_eq!(lines[1], "cd '/tmp/labs' && \\");
+        assert_eq!(lines[2], "  test -d 'project' && rm -rf 'project' && \\");
+        assert!(lines[3].starts_with("  cd '"));
+        assert!(lines[3].ends_with("' 2>/dev/null || cd '/tmp/labs'"));
     }
 
     // ---- Integration: emit_script with script builders ----
