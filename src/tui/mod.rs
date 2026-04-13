@@ -42,6 +42,8 @@ pub enum TuiOutcome {
     Selected(PathBuf),
     /// Virtual create-new entry selected.
     Create(PathBuf),
+    /// Immediate plain directory creation requested (Ctrl-T / prompt flow).
+    Mkdir(PathBuf),
     /// Marked entries confirmed for deletion.
     Delete(DeleteSelection),
     /// Rename confirmed for an existing entry.

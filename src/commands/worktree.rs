@@ -50,9 +50,12 @@ fn basename_from_path(path: &str) -> String {
     if let Ok(real) = fs::canonicalize(path) {
         real.file_name()
             .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| Path::new(path).file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| "lab".to_string()))
+            .unwrap_or_else(|| {
+                Path::new(path)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "lab".to_string())
+            })
     } else {
         Path::new(path)
             .file_name()
@@ -73,32 +76,46 @@ fn basename_from_path(path: &str) -> String {
 ///
 /// # Returns
 /// Exit code: 0 on success
-pub fn cmd_worktree(args: &[String], labs_path: &str) -> i32 {
-    let repo_arg = args.first().map(|s| s.as_str());
-    let name_args: Vec<&str> = args.iter().skip(1).map(|s| s.as_str()).collect();
-    let custom_name = if name_args.is_empty() {
-        None
+fn resolve_worktree_inputs(args: &[String]) -> (String, Option<String>) {
+    let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let cwd_string = cwd.to_string_lossy().to_string();
+    let cwd_has_git = cwd.join(".git").exists();
+
+    let use_cwd_as_repo_with_custom_name = args.len() == 1
+        && args.first().map(|s| s.as_str()) != Some("dir")
+        && cwd_has_git
+        && !Path::new(args[0].as_str()).exists();
+
+    let (repo_arg, custom_name) = if use_cwd_as_repo_with_custom_name {
+        (None, Some(args[0].clone()))
     } else {
-        Some(name_args.join(" "))
+        let repo_arg = args.first().map(|s| s.as_str());
+        let name_args: Vec<&str> = args.iter().skip(1).map(|s| s.as_str()).collect();
+        let custom_name = if name_args.is_empty() {
+            None
+        } else {
+            Some(name_args.join(" "))
+        };
+        (repo_arg, custom_name)
     };
 
-    // Resolve repo directory: if arg is "dir" or not provided, use cwd
     let repo_dir = match repo_arg {
-        Some("dir") | None => env::current_dir()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|_| ".".to_string()),
+        Some("dir") | None => cwd_string,
         Some(path) => {
             let expanded = PathBuf::from(path);
             if expanded.is_absolute() {
                 expanded.to_string_lossy().to_string()
             } else {
-                // Resolve relative to cwd
-                env::current_dir()
-                    .map(|cwd| cwd.join(&expanded).to_string_lossy().to_string())
-                    .unwrap_or_else(|_| expanded.to_string_lossy().to_string())
+                cwd.join(&expanded).to_string_lossy().to_string()
             }
         }
     };
+
+    (repo_dir, custom_name)
+}
+
+pub fn cmd_worktree(args: &[String], labs_path: &str) -> i32 {
+    let (repo_dir, custom_name) = resolve_worktree_inputs(args);
 
     let full_path = worktree_path(labs_path, &repo_dir, custom_name.as_deref());
 
@@ -266,7 +283,9 @@ mod tests {
 
     #[test]
     fn test_resolve_dot_path_bare_dot() {
-        let _guard = cwd_test_lock().lock().unwrap();
+        let _guard = cwd_test_lock()
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
         let result = resolve_dot_path(".");
         let cwd = env::current_dir().unwrap();
         assert_eq!(result, cwd.to_string_lossy().to_string());
@@ -292,19 +311,71 @@ mod tests {
             "testname".to_string(),
         ];
         let exit_code = cmd_worktree(&args, labs_dir.path().to_str().unwrap());
-        assert_eq!(exit_code, 0, "Non-git worktree should succeed with mkdir fallback");
+        assert_eq!(
+            exit_code, 0,
+            "Non-git worktree should succeed with mkdir fallback"
+        );
+    }
+
+    #[test]
+    fn test_resolve_worktree_inputs_single_name_in_git_repo_uses_cwd() {
+        let _guard = cwd_test_lock()
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let repo_dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(repo_dir.path().join(".git")).unwrap();
+        let old_dir = env::current_dir().unwrap();
+        env::set_current_dir(repo_dir.path()).unwrap();
+
+        let (resolved_repo, custom_name) = resolve_worktree_inputs(&["myfeature".to_string()]);
+
+        env::set_current_dir(old_dir).unwrap();
+        assert_eq!(
+            std::fs::canonicalize(&resolved_repo).unwrap(),
+            std::fs::canonicalize(repo_dir.path()).unwrap()
+        );
+        assert_eq!(custom_name, Some("myfeature".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_worktree_inputs_single_name_in_non_git_dir_treats_arg_as_repo() {
+        let _guard = cwd_test_lock()
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let base_dir = tempfile::tempdir().unwrap();
+        let old_dir = env::current_dir().unwrap();
+        env::set_current_dir(base_dir.path()).unwrap();
+
+        let (resolved_repo, custom_name) = resolve_worktree_inputs(&["myfeature".to_string()]);
+
+        env::set_current_dir(old_dir).unwrap();
+        assert_eq!(
+            std::fs::canonicalize(Path::new(&resolved_repo).parent().unwrap()).unwrap(),
+            std::fs::canonicalize(base_dir.path()).unwrap()
+        );
+        assert!(resolved_repo.ends_with("/myfeature"));
+        assert_eq!(custom_name, None);
     }
 
     #[test]
     fn test_cmd_dot_non_git_uses_mkdir() {
-        let _guard = cwd_test_lock().lock().unwrap();
+        let _guard = cwd_test_lock()
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
         // When invoked from a non-git directory, dot should use mkdir
         let labs_dir = tempfile::tempdir().unwrap();
         let non_git_dir = tempfile::tempdir().unwrap();
         let old_dir = env::current_dir().unwrap();
         let _ = env::set_current_dir(non_git_dir.path());
-        let exit_code = cmd_dot(".", &["testname".to_string()], labs_dir.path().to_str().unwrap());
+        let exit_code = cmd_dot(
+            ".",
+            &["testname".to_string()],
+            labs_dir.path().to_str().unwrap(),
+        );
         let _ = env::set_current_dir(&old_dir);
-        assert_eq!(exit_code, 0, "Non-git dot should succeed with mkdir fallback");
+        assert_eq!(
+            exit_code, 0,
+            "Non-git dot should succeed with mkdir fallback"
+        );
     }
 }

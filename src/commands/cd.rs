@@ -67,6 +67,7 @@ fn commands_for_outcome(outcome: &TuiOutcome, labs_path: &Path) -> Option<Vec<St
             Some(script::script_cd(&path))
         }
         TuiOutcome::Create(path) => Some(create_commands(path, labs_path)),
+        TuiOutcome::Mkdir(path) => Some(script::script_mkdir_cd(&path.to_string_lossy())),
         TuiOutcome::Delete(selection) => Some(script::script_delete(
             &selection.base_path.to_string_lossy(),
             &selection.basenames,
@@ -254,6 +255,26 @@ mod tests {
     }
 
     #[test]
+    fn test_mkdir_outcome_uses_plain_mkdir_commands_even_when_labs_path_is_git_repo() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::create_dir(dir.path().join(".git")).expect("git dir");
+        let path = dir.path().join("2026-04-13-feature");
+
+        let commands = commands_for_outcome(&TuiOutcome::Mkdir(path.clone()), dir.path())
+            .expect("mkdir commands");
+
+        assert_eq!(
+            commands,
+            vec![
+                format!("mkdir -p '{}'", path.to_string_lossy()),
+                format!("touch '{}'", path.to_string_lossy()),
+                format!("echo '{}'", path.to_string_lossy()),
+                format!("cd '{}'", path.to_string_lossy()),
+            ]
+        );
+    }
+
+    #[test]
     fn test_delete_outcome_uses_batch_delete_script() {
         let dir = tempfile::tempdir().expect("tempdir");
         let commands = commands_for_outcome(
@@ -336,7 +357,13 @@ mod tests {
                 dir.path().to_string_lossy()
             )
         );
-        assert_eq!(commands[4], format!("echo '{}'", destination.to_string_lossy()));
-        assert_eq!(commands[5], format!("cd '{}'", destination.to_string_lossy()));
+        assert_eq!(
+            commands[4],
+            format!("echo '{}'", destination.to_string_lossy())
+        );
+        assert_eq!(
+            commands[5],
+            format!("cd '{}'", destination.to_string_lossy())
+        );
     }
 }

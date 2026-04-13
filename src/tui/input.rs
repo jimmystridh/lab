@@ -223,6 +223,9 @@ fn handle_control_key(app: &mut App, character: char) -> Option<TuiOutcome> {
             app.begin_rename();
             None
         }
+        't' => app
+            .create_new_name()
+            .map(|name| TuiOutcome::Mkdir(app.labs_path.join(name))),
         'w' => {
             app.delete_word_backward();
             None
@@ -428,6 +431,14 @@ mod tests {
         )
     }
 
+    fn make_app_with_create_new_selected() -> App {
+        let mut app = make_app(Some("alp"));
+        assert_eq!(app.filtered.len(), 1);
+        app.move_down();
+        assert_eq!(app.current_entry_index(), None);
+        app
+    }
+
     #[test]
     fn test_printable_chars_insert_at_cursor_and_refilter() {
         let mut app = make_app(Some("bt"));
@@ -548,6 +559,19 @@ mod tests {
     }
 
     #[test]
+    fn test_ctrl_d_on_create_new_row_after_real_entries_does_nothing() {
+        let mut app = make_app_with_create_new_selected();
+
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert!(app.marks.is_empty());
+        assert!(!app.is_delete_mode());
+    }
+
+    #[test]
     fn test_ctrl_r_opens_rename_dialog_with_prefilled_name() {
         let mut app = make_app(None);
         app.move_down();
@@ -573,6 +597,19 @@ mod tests {
             Some("new project"),
             TerminalSize::new(80, 24),
         );
+
+        let outcome = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL),
+        );
+
+        assert!(outcome.is_none());
+        assert!(!app.is_renaming());
+    }
+
+    #[test]
+    fn test_ctrl_r_on_create_new_row_after_real_entries_does_nothing() {
+        let mut app = make_app_with_create_new_selected();
 
         let outcome = handle_key(
             &mut app,
@@ -616,6 +653,34 @@ mod tests {
 
         assert!(outcome.is_none());
         assert!(!app.is_graduating());
+    }
+
+    #[test]
+    fn test_ctrl_g_on_create_new_row_after_real_entries_does_nothing() {
+        let mut app = make_app_with_create_new_selected();
+
+        let outcome = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL),
+        );
+
+        assert!(outcome.is_none());
+        assert!(!app.is_graduating());
+    }
+
+    #[test]
+    fn test_ctrl_t_returns_plain_mkdir_outcome_using_current_input() {
+        let mut app = make_app(Some("alp"));
+        let expected_path = app
+            .labs_path
+            .join(app.create_new_name().expect("create-new name"));
+
+        let outcome = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL),
+        );
+
+        assert_eq!(outcome, Some(TuiOutcome::Mkdir(expected_path)));
     }
 
     #[test]

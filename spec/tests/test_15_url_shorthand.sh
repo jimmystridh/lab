@@ -3,6 +3,14 @@
 
 section "url-shorthand"
 
+# Test: top-level cd <url> also acts as clone shorthand
+output=$(lab_run --path="$TEST_LABS" --and-exit cd https://github.com/user/repo 2>&1)
+if echo "$output" | grep -q "git clone"; then
+    pass
+else
+    fail "top-level cd <url> should trigger git clone" "git clone command" "$output" "command_line.md#clone"
+fi
+
 # Test: cd <url> acts as clone shorthand
 output=$(lab_run --path="$TEST_LABS" --and-exit exec cd https://github.com/user/repo  2>&1)
 if echo "$output" | grep -q "git clone"; then

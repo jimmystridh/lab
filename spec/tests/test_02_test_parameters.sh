@@ -12,12 +12,13 @@ else
 fi
 
 # Test --and-keys exists (inject keys)
-# ESC should cancel and output "Cancelled."
+# ESC should cancel with exit code 1 and no shell script output.
 output=$(lab_run --path="$TEST_LABS" --and-keys=$'\x1b' exec 2>/dev/null)
-if echo "$output" | grep -qi "cancel"; then
+status=$?
+if [ "$status" -eq 1 ] && [ -z "$output" ]; then
     pass
 else
-    fail "--and-keys not working (ESC should cancel)" "contains 'cancel'" "$output" "command_line.md#testing-and-debugging"
+    fail "--and-keys not working (ESC should cancel silently)" "exit 1 with no stdout" "status=$status output=$output" "command_line.md#testing-and-debugging"
 fi
 
 # Test --and-keys with Enter (should select and output cd script)

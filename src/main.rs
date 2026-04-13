@@ -78,6 +78,26 @@ fn shellexpand_tilde(path: &str) -> String {
     path.to_string()
 }
 
+/// Dispatch the shared `cd`/selector path, including git-URL clone shorthand.
+fn dispatch_cd_args(
+    args: &[String],
+    labs_path: &str,
+    and_exit: bool,
+    and_keys: Option<&str>,
+    and_type: Option<&str>,
+    and_confirm: Option<&str>,
+) -> i32 {
+    if let Some(url_arg) = args.first() {
+        if git::is_git_uri(url_arg) {
+            let uri = Some(url_arg.as_str());
+            let custom_name = args.get(1).map(|s| s.as_str());
+            return commands::clone::cmd_clone(uri, custom_name, labs_path);
+        }
+    }
+
+    commands::cd::cmd_cd(args, labs_path, and_exit, and_keys, and_type, and_confirm)
+}
+
 /// Dispatch exec command routing.
 ///
 /// Handles sub-dispatch for clone, worktree, cd, dot shorthand, URL shorthand,
@@ -109,17 +129,14 @@ fn dispatch_exec(
     // Sub-dispatch: exec cd → cd path (with remaining args)
     if first == Some("cd") {
         let sub_args: Vec<String> = args.iter().skip(1).cloned().collect();
-
-        // URL shorthand inside cd: exec cd <url> → clone
-        if let Some(url_arg) = sub_args.first() {
-            if git::is_git_uri(url_arg) {
-                let uri = Some(url_arg.as_str());
-                let custom_name = sub_args.get(1).map(|s| s.as_str());
-                return commands::clone::cmd_clone(uri, custom_name, labs_path);
-            }
-        }
-
-        return commands::cd::cmd_cd(&sub_args, labs_path, and_exit, and_keys, and_type, and_confirm);
+        return dispatch_cd_args(
+            &sub_args,
+            labs_path,
+            and_exit,
+            and_keys,
+            and_type,
+            and_confirm,
+        );
     }
 
     // Dot shorthand: exec . [name] or exec ./subdir name
@@ -131,17 +148,8 @@ fn dispatch_exec(
         }
     }
 
-    // URL shorthand: if first arg looks like git URI → clone
-    if let Some(f) = first {
-        if git::is_git_uri(f) {
-            let uri = Some(f);
-            let custom_name = args.get(1).map(|s| s.as_str());
-            return commands::clone::cmd_clone(uri, custom_name, labs_path);
-        }
-    }
-
     // Default: cd/TUI path with remaining args as query
-    commands::cd::cmd_cd(args, labs_path, and_exit, and_keys, and_type, and_confirm)
+    dispatch_cd_args(args, labs_path, and_exit, and_keys, and_type, and_confirm)
 }
 
 fn main() {
@@ -187,11 +195,8 @@ fn main() {
                 Some(cli::NormalizedCommand::Clone) => {
                     let uri = args.args.first().map(|s| s.as_str());
                     let custom_name = args.args.get(1).map(|s| s.as_str());
-                    let exit_code = commands::clone::cmd_clone(
-                        uri,
-                        custom_name,
-                        &labs_path.to_string_lossy(),
-                    );
+                    let exit_code =
+                        commands::clone::cmd_clone(uri, custom_name, &labs_path.to_string_lossy());
                     process::exit(exit_code);
                 }
                 Some(cli::NormalizedCommand::Worktree) => {
@@ -214,7 +219,7 @@ fn main() {
                 Some(cli::NormalizedCommand::Cd) => {
                     // cd command: same as exec cd
                     let labs = labs_path.to_string_lossy().to_string();
-                    let exit_code = commands::cd::cmd_cd(
+                    let exit_code = dispatch_cd_args(
                         &args.args,
                         &labs,
                         args.and_exit,
@@ -240,5 +245,44 @@ fn main() {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dispatch_cd_args_routes_git_urls_to_clone_workflow() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let args = vec!["https://github.com/user/repo".to_string()];
+
+        let exit_code = dispatch_cd_args(
+            &args,
+            dir.path().to_str().expect("path"),
+            true,
+            None,
+            None,
+            None,
+        );
+
+        assert_eq!(exit_code, 0);
+    }
+
+    #[test]
+    fn test_dispatch_cd_args_keeps_non_urls_on_selector_path() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let args = vec!["alpha".to_string()];
+
+        let exit_code = dispatch_cd_args(
+            &args,
+            dir.path().to_str().expect("path"),
+            true,
+            None,
+            None,
+            None,
+        );
+
+        assert_eq!(exit_code, 1);
     }
 }
