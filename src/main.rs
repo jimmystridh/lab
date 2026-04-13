@@ -112,14 +112,13 @@ fn main() {
             // Dispatch based on command
             match args.command {
                 Some(cli::Command::Init) => {
-                    // TODO: Implement in commands/init.rs
-                    eprintln!("lab: init command not yet implemented");
-                    process::exit(1);
+                    commands::init::cmd_init(&args.args, &labs_path.to_string_lossy());
+                    process::exit(0);
                 }
                 Some(cli::Command::Install) => {
-                    // TODO: Implement in commands/install.rs
-                    eprintln!("lab: install command not yet implemented");
-                    process::exit(1);
+                    let exit_code =
+                        commands::install::cmd_install(&args.args, &labs_path.to_string_lossy());
+                    process::exit(exit_code);
                 }
                 Some(cli::Command::Clone) => {
                     // TODO: Implement in commands/clone.rs
