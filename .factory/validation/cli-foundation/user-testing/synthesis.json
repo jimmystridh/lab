@@ -102,5 +102,12 @@
     "frictions": [],
     "blockers": []
   },
-  "previousRound": null
+  "previousRound": null,
+  "orchestratorOverride": {
+    "deferredAssertions": [
+      "VAL-CLI-038"
+    ],
+    "movedToFeatureId": "graduate-mode",
+    "reason": "Rename and graduate script surfaces do not exist until tui-actions, so full validation of all script echo surfaces is deferred to that milestone."
+  }
 }
