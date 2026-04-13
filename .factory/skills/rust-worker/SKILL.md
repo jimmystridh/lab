@@ -71,12 +71,16 @@ Fix any errors or warnings before proceeding.
 
 ### 7. Verify with Spec Tests
 
-If the feature has corresponding spec tests in `spec/tests/`:
+If the feature has corresponding spec tests in `spec/tests/`, run only the spec tests listed in that feature's `verificationSteps`.
+
+Use the full `bash spec/tests/runner.sh ./target/debug/lab` suite only when the feature explicitly calls for it or when the milestone should already satisfy all earlier assertions. Failures from later-milestone features should not block a correctly scoped feature.
+
+If the feature has corresponding spec tests and the verificationSteps explicitly call for the full runner:
 ```bash
 cargo build && bash spec/tests/runner.sh ./target/debug/lab
 ```
 
-If spec tests don't exist yet (early features), note this in the handoff.
+If spec tests don't exist yet (early features), or the full runner is intentionally not applicable yet, note this explicitly in the handoff.
 
 ### 8. Manual Verification
 
