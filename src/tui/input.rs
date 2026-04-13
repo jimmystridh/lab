@@ -133,6 +133,22 @@ mod tests {
         )
     }
 
+    fn make_scrolling_app(entry_count: usize, height: u16) -> App {
+        App::new(
+            "/tmp/labs",
+            (0..entry_count)
+                .map(|index| {
+                    make_entry(
+                        &format!("entry-{index:02}"),
+                        entry_count as f64 - index as f64,
+                    )
+                })
+                .collect(),
+            None,
+            TerminalSize::new(80, height),
+        )
+    }
+
     #[test]
     fn test_printable_chars_insert_at_cursor_and_refilter() {
         let mut app = make_app(Some("bt"));
@@ -191,5 +207,82 @@ mod tests {
             outcome,
             Some(TuiOutcome::Selected(PathBuf::from("/tmp/2025-11-15-beta")))
         );
+    }
+
+    #[test]
+    fn test_down_bindings_move_selection_down() {
+        let down_keys = [
+            KeyEvent::new(KeyCode::Down, KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('n'), KeyModifiers::CONTROL),
+            KeyEvent::new(KeyCode::Char('j'), KeyModifiers::CONTROL),
+        ];
+
+        for key in down_keys {
+            let mut app = make_app(None);
+            let outcome = handle_key(&mut app, key);
+
+            assert!(outcome.is_none());
+            assert_eq!(app.cursor_pos, 1);
+        }
+    }
+
+    #[test]
+    fn test_up_bindings_move_selection_up() {
+        let up_keys = [
+            KeyEvent::new(KeyCode::Up, KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('p'), KeyModifiers::CONTROL),
+        ];
+
+        for key in up_keys {
+            let mut app = make_app(None);
+            app.move_down();
+            app.move_down();
+
+            let outcome = handle_key(&mut app, key);
+
+            assert!(outcome.is_none());
+            assert_eq!(app.cursor_pos, 1);
+        }
+    }
+
+    #[test]
+    fn test_home_end_and_page_keys_use_navigation_methods() {
+        let mut app = make_scrolling_app(8, 8);
+
+        assert!(handle_key(&mut app, KeyEvent::new(KeyCode::End, KeyModifiers::NONE)).is_none());
+        assert_eq!(app.cursor_pos, app.total_items() - 1);
+        assert_eq!(app.scroll_offset, 5);
+
+        assert!(handle_key(&mut app, KeyEvent::new(KeyCode::Home, KeyModifiers::NONE)).is_none());
+        assert_eq!(app.cursor_pos, 0);
+        assert_eq!(app.scroll_offset, 0);
+
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::PageDown, KeyModifiers::NONE)
+        )
+        .is_none());
+        assert_eq!(app.cursor_pos, app.visible_result_limit());
+        assert_eq!(app.scroll_offset, 1);
+
+        assert!(handle_key(&mut app, KeyEvent::new(KeyCode::PageUp, KeyModifiers::NONE)).is_none());
+        assert_eq!(app.cursor_pos, 0);
+        assert_eq!(app.scroll_offset, 0);
+    }
+
+    #[test]
+    fn test_ctrl_k_without_buffer_change_keeps_selection_position() {
+        let mut app = make_app(Some("beta"));
+        app.cursor_pos = 2;
+        app.move_input_to_end();
+
+        let outcome = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('k'), KeyModifiers::CONTROL),
+        );
+
+        assert!(outcome.is_none());
+        assert_eq!(app.input, "beta");
+        assert_eq!(app.cursor_pos, 2);
     }
 }

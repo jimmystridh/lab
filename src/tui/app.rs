@@ -249,6 +249,10 @@ impl App {
     /// Delete from the input cursor to the end of the line.
     pub fn kill_to_end(&mut self) {
         let byte_pos = self.char_to_byte_pos(self.input_cursor_pos);
+        if byte_pos >= self.input.len() {
+            return;
+        }
+
         self.input.truncate(byte_pos);
         self.on_query_changed();
     }
@@ -357,6 +361,22 @@ mod tests {
         )
     }
 
+    fn make_scrolling_app(entry_count: usize, height: u16) -> App {
+        App::new(
+            "/tmp/labs",
+            (0..entry_count)
+                .map(|index| {
+                    make_entry(
+                        &format!("entry-{index:02}"),
+                        entry_count as f64 - index as f64,
+                    )
+                })
+                .collect(),
+            None,
+            TerminalSize::new(80, height),
+        )
+    }
+
     #[test]
     fn test_app_prefills_input_from_and_type() {
         let app = make_app(Some("beta"));
@@ -396,20 +416,49 @@ mod tests {
     }
 
     #[test]
+    fn test_move_up_clamps_to_zero() {
+        let mut app = make_app(None);
+        app.move_down();
+        app.move_up();
+        app.move_up();
+
+        assert_eq!(app.cursor_pos, 0);
+        assert_eq!(app.scroll_offset, 0);
+    }
+
+    #[test]
+    fn test_move_to_top_and_bottom_clamp_to_bounds() {
+        let mut app = make_scrolling_app(8, 8);
+
+        app.move_to_bottom();
+        assert_eq!(app.cursor_pos, 7);
+        assert_eq!(app.scroll_offset, 5);
+
+        app.move_to_top();
+        assert_eq!(app.cursor_pos, 0);
+        assert_eq!(app.scroll_offset, 0);
+    }
+
+    #[test]
     fn test_page_navigation_uses_visible_result_limit() {
-        let mut app = App::new(
-            "/tmp/labs",
-            (0..20)
-                .map(|index| make_entry(&format!("entry-{index:02}"), 20.0 - index as f64))
-                .collect(),
-            None,
-            TerminalSize::new(80, 10),
-        );
+        let mut app = make_scrolling_app(20, 10);
 
         app.page_down();
         assert_eq!(app.cursor_pos, app.visible_result_limit());
         app.page_up();
         assert_eq!(app.cursor_pos, 0);
+    }
+
+    #[test]
+    fn test_page_navigation_clamps_at_bounds() {
+        let mut app = make_scrolling_app(5, 8);
+
+        app.page_up();
+        assert_eq!(app.cursor_pos, 0);
+
+        app.move_to_bottom();
+        app.page_down();
+        assert_eq!(app.cursor_pos, app.total_items() - 1);
     }
 
     #[test]
@@ -431,6 +480,34 @@ mod tests {
         );
 
         assert_eq!(tiny.visible_result_limit(), 3);
+    }
+
+    #[test]
+    fn test_scroll_offset_tracks_cursor_visibility() {
+        let mut app = make_scrolling_app(8, 8);
+
+        app.move_down();
+        app.move_down();
+        assert_eq!(app.cursor_pos, 2);
+        assert_eq!(app.scroll_offset, 0);
+
+        app.move_down();
+        assert_eq!(app.cursor_pos, 3);
+        assert_eq!(app.scroll_offset, 1);
+
+        app.move_down();
+        assert_eq!(app.cursor_pos, 4);
+        assert_eq!(app.scroll_offset, 2);
+
+        app.move_up();
+        app.move_up();
+        app.move_up();
+        assert_eq!(app.cursor_pos, 1);
+        assert_eq!(app.scroll_offset, 1);
+
+        app.move_up();
+        assert_eq!(app.cursor_pos, 0);
+        assert_eq!(app.scroll_offset, 0);
     }
 
     #[test]
@@ -458,5 +535,35 @@ mod tests {
         assert_eq!(resolve_dimension(Some("120"), 80, 24), 120);
         assert_eq!(resolve_dimension(Some("0"), 80, 24), 80);
         assert_eq!(resolve_dimension(Some("not-a-number"), 80, 24), 80);
+    }
+
+    #[test]
+    fn test_fifty_downs_on_five_item_list_clamps_to_last_entry() {
+        let mut app = make_scrolling_app(5, 24);
+        for _ in 0..50 {
+            app.move_down();
+        }
+
+        assert_eq!(app.cursor_pos, 4);
+        assert_eq!(app.scroll_offset, 0);
+    }
+
+    #[test]
+    fn test_kill_to_end_only_resets_selection_when_input_changes() {
+        let mut app = make_app(Some("beta"));
+        app.cursor_pos = 2;
+        app.scroll_offset = 1;
+
+        app.move_input_to_end();
+        app.kill_to_end();
+        assert_eq!(app.input, "beta");
+        assert_eq!(app.cursor_pos, 2);
+        assert_eq!(app.scroll_offset, 1);
+
+        app.move_input_to_start();
+        app.kill_to_end();
+        assert!(app.input.is_empty());
+        assert_eq!(app.cursor_pos, 0);
+        assert_eq!(app.scroll_offset, 0);
     }
 }
