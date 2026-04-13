@@ -42,7 +42,7 @@ pub enum TuiOutcome {
     /// Virtual create-new entry selected.
     Create(PathBuf),
     /// Selector cancelled without emitting a shell script.
-    Cancelled { emit_message: bool },
+    Cancelled,
 }
 
 type TuiTerminal = Terminal<CrosstermBackend<Stderr>>;
@@ -57,9 +57,7 @@ pub fn run_tui(app: &mut App, options: RunOptions<'_>) -> io::Result<TuiOutcome>
     let interactive = !options.use_test_source;
     if interactive && (!io::stdin().is_terminal() || !io::stderr().is_terminal()) {
         eprintln!("Error: lab requires an interactive terminal");
-        return Ok(TuiOutcome::Cancelled {
-            emit_message: false,
-        });
+        return Ok(TuiOutcome::Cancelled);
     }
 
     if options.use_test_source {
@@ -69,9 +67,7 @@ pub fn run_tui(app: &mut App, options: RunOptions<'_>) -> io::Result<TuiOutcome>
                 let _ = drive_test_mode(app, &mut key_source);
             }
             io::stderr().write_all(render::render_snapshot(app).as_bytes())?;
-            return Ok(TuiOutcome::Cancelled {
-                emit_message: false,
-            });
+            return Ok(TuiOutcome::Cancelled);
         }
 
         let mut key_source = TestKeySource::new(options.and_keys);

@@ -15,9 +15,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub fn handle_key(app: &mut App, key: KeyEvent) -> Option<TuiOutcome> {
     match key.code {
         KeyCode::Enter => Some(selection_outcome(app.current_selection())),
-        KeyCode::Esc => Some(TuiOutcome::Cancelled {
-            emit_message: false,
-        }),
+        KeyCode::Esc => Some(TuiOutcome::Cancelled),
         KeyCode::Backspace => {
             app.backspace();
             None
@@ -67,9 +65,7 @@ fn handle_control_key(app: &mut App, character: char) -> Option<TuiOutcome> {
             app.move_input_back();
             None
         }
-        'c' => Some(TuiOutcome::Cancelled {
-            emit_message: false,
-        }),
+        'c' => Some(TuiOutcome::Cancelled),
         'e' => {
             app.move_input_to_end();
             None
@@ -106,9 +102,7 @@ fn selection_outcome(selection: Option<Selection>) -> TuiOutcome {
     match selection {
         Some(Selection::Existing(path)) => TuiOutcome::Selected(path),
         Some(Selection::Create(path)) => TuiOutcome::Create(path),
-        None => TuiOutcome::Cancelled {
-            emit_message: false,
-        },
+        None => TuiOutcome::Cancelled,
     }
 }
 
@@ -223,12 +217,7 @@ mod tests {
 
         let outcome = handle_key(&mut app, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
 
-        assert_eq!(
-            outcome,
-            Some(TuiOutcome::Cancelled {
-                emit_message: false
-            })
-        );
+        assert_eq!(outcome, Some(TuiOutcome::Cancelled));
     }
 
     #[test]
@@ -240,12 +229,7 @@ mod tests {
             KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
         );
 
-        assert_eq!(
-            outcome,
-            Some(TuiOutcome::Cancelled {
-                emit_message: false
-            })
-        );
+        assert_eq!(outcome, Some(TuiOutcome::Cancelled));
     }
 
     #[test]

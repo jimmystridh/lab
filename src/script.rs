@@ -81,8 +81,9 @@ pub fn script_clone(path: &str, uri: &str) -> Vec<String> {
 /// Build commands for creating a git worktree and cd-ing into it.
 ///
 /// Creates the target directory, prints an informational message,
-/// runs `git worktree add --detach` via a sh -c wrapper, then does
-/// touch + echo + cd.
+/// runs `git worktree add --detach` via a sh -c wrapper whose inner
+/// `$repo` variable is escaped so outer eval shells do not expand it early,
+/// then does touch + echo + cd.
 ///
 /// If `repo` is `Some`, the worktree is created from the specified repo
 /// directory. Otherwise, it uses the current working directory.
@@ -95,14 +96,14 @@ pub fn script_worktree(path: &str, repo: Option<&str>) -> Vec<String> {
         format!(
             "/usr/bin/env sh -c \"if git -C {} rev-parse --is-inside-work-tree >/dev/null 2>&1; \
              then repo=$(git -C {} rev-parse --show-toplevel); \
-             git -C \\\"$repo\\\" worktree add --detach {} >/dev/null 2>&1 || true; fi; exit 0\"",
+             git -C \\\"\\$repo\\\" worktree add --detach {} >/dev/null 2>&1 || true; fi; exit 0\"",
             q_repo, q_repo, q_path
         )
     } else {
         format!(
             "/usr/bin/env sh -c \"if git rev-parse --is-inside-work-tree >/dev/null 2>&1; \
              then repo=$(git rev-parse --show-toplevel); \
-             git -C \\\"$repo\\\" worktree add --detach {} >/dev/null 2>&1 || true; fi; exit 0\"",
+             git -C \\\"\\$repo\\\" worktree add --detach {} >/dev/null 2>&1 || true; fi; exit 0\"",
             q_path
         )
     };
@@ -131,7 +132,9 @@ pub fn script_worktree(path: &str, repo: Option<&str>) -> Vec<String> {
 mod tests {
     use super::*;
     use std::{
+        fs,
         io::Write,
+        path::Path,
         process::{Command, ExitStatus, Stdio},
     };
 
@@ -174,6 +177,37 @@ mod tests {
             .write_all(script.as_bytes())
             .expect("write script");
         child.wait().expect("wait for syntax check")
+    }
+
+    fn run_git(path: &Path, args: &[&str]) {
+        let status = Command::new("git")
+            .arg("-C")
+            .arg(path)
+            .args(args)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .expect("run git");
+        assert!(status.success(), "git {:?} failed with {status:?}", args);
+    }
+
+    fn init_git_repo(path: &Path) {
+        fs::create_dir_all(path).expect("create repo directory");
+        let status = Command::new("git")
+            .arg("init")
+            .arg(path)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .expect("git init");
+        assert!(status.success(), "git init failed with {status:?}");
+
+        run_git(path, &["config", "user.name", "Lab Test"]);
+        run_git(path, &["config", "user.email", "lab@example.com"]);
+
+        fs::write(path.join("README.md"), "seed\n").expect("write seed file");
+        run_git(path, &["add", "README.md"]);
+        run_git(path, &["commit", "-m", "seed"]);
     }
 
     #[test]
@@ -367,10 +401,16 @@ mod tests {
             cmds[2]
         );
         assert!(
+            cmds[2].contains("git -C '/Users/js/myrepo' rev-parse --show-toplevel"),
+            "cmds[2] = {:?}",
+            cmds[2]
+        );
+        assert!(
             cmds[2].contains("'/Users/js/myrepo'"),
             "cmds[2] = {:?}",
             cmds[2]
         );
+        assert!(cmds[2].contains("\\$repo"), "cmds[2] = {:?}", cmds[2]);
         assert!(
             cmds[2].starts_with("/usr/bin/env sh -c"),
             "cmds[2] should start with sh -c"
@@ -421,6 +461,56 @@ mod tests {
         assert!(
             status.success(),
             "expected sh -n to accept emitted worktree script, got {status:?}"
+        );
+    }
+
+    #[test]
+    fn test_script_worktree_executes_when_outer_shell_has_repo_env_var() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let repo = dir.path().join("labs-root");
+        init_git_repo(&repo);
+
+        let target = repo.join("2026-04-13-feature");
+        let cmds = script_worktree(
+            target.to_str().expect("target path"),
+            Some(repo.to_str().expect("repo path")),
+        );
+        let output = capture_emit_script(&cmds);
+
+        let status = Command::new("/bin/bash")
+            .env("LAB_EMITTED_SCRIPT", &output)
+            .env("repo", dir.path().join("wrong-repo"))
+            .arg("-c")
+            .arg("set -euo pipefail\neval \"$LAB_EMITTED_SCRIPT\"")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .expect("eval worktree script");
+        assert!(
+            status.success(),
+            "expected emitted worktree script to succeed, got {status:?}"
+        );
+
+        let git_common_dir = Command::new("git")
+            .arg("-C")
+            .arg(&target)
+            .args(["rev-parse", "--git-common-dir"])
+            .output()
+            .expect("inspect linked worktree");
+        assert!(
+            git_common_dir.status.success(),
+            "expected created path to be a git worktree, stdout={:?}, stderr={:?}",
+            String::from_utf8_lossy(&git_common_dir.stdout),
+            String::from_utf8_lossy(&git_common_dir.stderr)
+        );
+        let common_dir_path = target.join(String::from_utf8_lossy(&git_common_dir.stdout).trim());
+        assert_eq!(
+            fs::canonicalize(common_dir_path).expect("canonicalize linked git dir"),
+            fs::canonicalize(repo.join(".git")).expect("canonicalize repo git dir")
+        );
+        assert!(
+            target.join(".git").is_file(),
+            "expected linked worktree .git file"
         );
     }
 

@@ -67,7 +67,7 @@ fn commands_for_outcome(outcome: &TuiOutcome, labs_path: &Path) -> Option<Vec<St
             Some(script::script_cd(&path))
         }
         TuiOutcome::Create(path) => Some(create_commands(path, labs_path)),
-        TuiOutcome::Cancelled { .. } => None,
+        TuiOutcome::Cancelled => None,
     }
 }
 
@@ -193,12 +193,7 @@ mod tests {
     fn test_commands_for_cancelled_outcome_return_none() {
         let dir = tempfile::tempdir().expect("tempdir");
 
-        let commands = commands_for_outcome(
-            &TuiOutcome::Cancelled {
-                emit_message: false,
-            },
-            dir.path(),
-        );
+        let commands = commands_for_outcome(&TuiOutcome::Cancelled, dir.path());
 
         assert!(commands.is_none());
     }
@@ -236,5 +231,10 @@ mod tests {
         assert!(commands[1].contains("Using git worktree"));
         assert!(commands[2].contains("worktree add --detach"));
         assert!(commands[2].contains(&format!("git -C '{}'", dir.path().to_string_lossy())));
+        assert!(commands[2].contains("\\$repo"));
+        assert!(commands[2].contains(&format!(
+            "git -C '{}' rev-parse --show-toplevel",
+            dir.path().to_string_lossy()
+        )));
     }
 }
