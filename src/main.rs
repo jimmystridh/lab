@@ -78,6 +78,72 @@ fn shellexpand_tilde(path: &str) -> String {
     path.to_string()
 }
 
+/// Dispatch exec command routing.
+///
+/// Handles sub-dispatch for clone, worktree, cd, dot shorthand, URL shorthand,
+/// and the default cd/TUI path.
+fn dispatch_exec(
+    args: &[String],
+    labs_path: &str,
+    and_exit: bool,
+    and_keys: Option<&str>,
+    and_type: Option<&str>,
+    and_confirm: Option<&str>,
+) -> i32 {
+    let first = args.first().map(|s| s.as_str());
+
+    // Sub-dispatch: exec clone → cmd_clone
+    if first == Some("clone") {
+        let sub_args: Vec<&str> = args.iter().skip(1).map(|s| s.as_str()).collect();
+        let uri = sub_args.first().copied();
+        let custom_name = sub_args.get(1).copied();
+        return commands::clone::cmd_clone(uri, custom_name, labs_path);
+    }
+
+    // Sub-dispatch: exec worktree → cmd_worktree
+    if first == Some("worktree") {
+        let sub_args: Vec<String> = args.iter().skip(1).cloned().collect();
+        return commands::worktree::cmd_worktree(&sub_args, labs_path);
+    }
+
+    // Sub-dispatch: exec cd → cd path (with remaining args)
+    if first == Some("cd") {
+        let sub_args: Vec<String> = args.iter().skip(1).cloned().collect();
+
+        // URL shorthand inside cd: exec cd <url> → clone
+        if let Some(url_arg) = sub_args.first() {
+            if git::is_git_uri(url_arg) {
+                let uri = Some(url_arg.as_str());
+                let custom_name = sub_args.get(1).map(|s| s.as_str());
+                return commands::clone::cmd_clone(uri, custom_name, labs_path);
+            }
+        }
+
+        return commands::cd::cmd_cd(&sub_args, labs_path, and_exit, and_keys, and_type, and_confirm);
+    }
+
+    // Dot shorthand: exec . [name] or exec ./subdir name
+    if let Some(f) = first {
+        if f.starts_with('.') {
+            let dot_arg = f.to_string();
+            let rest: Vec<String> = args.iter().skip(1).cloned().collect();
+            return commands::worktree::cmd_dot(&dot_arg, &rest, labs_path);
+        }
+    }
+
+    // URL shorthand: if first arg looks like git URI → clone
+    if let Some(f) = first {
+        if git::is_git_uri(f) {
+            let uri = Some(f);
+            let custom_name = args.get(1).map(|s| s.as_str());
+            return commands::clone::cmd_clone(uri, custom_name, labs_path);
+        }
+    }
+
+    // Default: cd/TUI path with remaining args as query
+    commands::cd::cmd_cd(args, labs_path, and_exit, and_keys, and_type, and_confirm)
+}
+
 fn main() {
     // Check NO_COLOR env var early (before parsing args)
     if let Ok(val) = env::var("NO_COLOR") {
@@ -134,131 +200,30 @@ fn main() {
                     process::exit(exit_code);
                 }
                 Some(cli::Command::Exec) => {
-                    // Sub-dispatch: exec clone → cmd_clone
-                    if args.args.first().map(|s| s.as_str()) == Some("clone") {
-                        let sub_args: Vec<&str> =
-                            args.args.iter().skip(1).map(|s| s.as_str()).collect();
-                        let uri = sub_args.first().copied();
-                        let custom_name = sub_args.get(1).copied();
-                        let exit_code = commands::clone::cmd_clone(
-                            uri,
-                            custom_name,
-                            &labs_path.to_string_lossy(),
-                        );
-                        process::exit(exit_code);
-                    }
-
-                    // Sub-dispatch: exec worktree → cmd_worktree
-                    if args.args.first().map(|s| s.as_str()) == Some("worktree") {
-                        let sub_args: Vec<String> =
-                            args.args.iter().skip(1).cloned().collect();
-                        let exit_code = commands::worktree::cmd_worktree(
-                            &sub_args,
-                            &labs_path.to_string_lossy(),
-                        );
-                        process::exit(exit_code);
-                    }
-
-                    // Dot shorthand: exec . [name] or exec ./subdir name
-                    if let Some(first) = args.args.first() {
-                        if first.starts_with('.') {
-                            let dot_arg = first.clone();
-                            let rest: Vec<String> =
-                                args.args.iter().skip(1).cloned().collect();
-                            let exit_code = commands::worktree::cmd_dot(
-                                &dot_arg,
-                                &rest,
-                                &labs_path.to_string_lossy(),
-                            );
-                            process::exit(exit_code);
-                        }
-                    }
-
-                    // URL shorthand: if first arg looks like git URI → clone
-                    if let Some(first) = args.args.first() {
-                        if git::is_git_uri(first) {
-                            let uri = Some(first.as_str());
-                            let custom_name = args.args.get(1).map(|s| s.as_str());
-                            let exit_code = commands::clone::cmd_clone(
-                                uri,
-                                custom_name,
-                                &labs_path.to_string_lossy(),
-                            );
-                            process::exit(exit_code);
-                        }
-                    }
-
-                    // Load entries and apply fuzzy matching
-                    let all_entries = entries::load_entries(&labs_path);
-                    let query = args.args.join(" ");
-                    let height: usize = std::env::var("LAB_HEIGHT")
-                        .ok()
-                        .and_then(|v| v.parse().ok())
-                        .unwrap_or(24);
-                    let limit = std::cmp::max(height.saturating_sub(6), 3);
-
-                    let fuzz = fuzzy::Fuzzy::new(&all_entries);
-                    let _results = fuzz.match_entries(&query, limit);
-
-                    if args.and_exit {
-                        // Render one frame and exit (TUI test mode)
-                        // TUI rendering not yet implemented, but entries are loaded
-                        eprintln!("lab: TUI not yet implemented");
-                        process::exit(1);
-                    }
-                    eprintln!("lab: exec command not yet implemented");
-                    process::exit(1);
+                    let labs = labs_path.to_string_lossy().to_string();
+                    let exit_code = dispatch_exec(
+                        &args.args,
+                        &labs,
+                        args.and_exit,
+                        args.and_keys.as_deref(),
+                        args.and_type.as_deref(),
+                        args.and_confirm.as_deref(),
+                    );
+                    process::exit(exit_code);
                 }
                 None => {
-                    // Default: treat remaining args as search query → TUI selector
+                    // Default: treat remaining args as search query
                     // Same as `lab exec [query]`
-
-                    // Dot shorthand: lab . [name] or lab ./subdir name
-                    if let Some(first) = args.args.first() {
-                        if first.starts_with('.') {
-                            let dot_arg = first.clone();
-                            let rest: Vec<String> =
-                                args.args.iter().skip(1).cloned().collect();
-                            let exit_code = commands::worktree::cmd_dot(
-                                &dot_arg,
-                                &rest,
-                                &labs_path.to_string_lossy(),
-                            );
-                            process::exit(exit_code);
-                        }
-                    }
-
-                    // URL shorthand: if first arg looks like git URI → clone
-                    if let Some(first) = args.args.first() {
-                        if git::is_git_uri(first) {
-                            let uri = Some(first.as_str());
-                            let custom_name = args.args.get(1).map(|s| s.as_str());
-                            let exit_code = commands::clone::cmd_clone(
-                                uri,
-                                custom_name,
-                                &labs_path.to_string_lossy(),
-                            );
-                            process::exit(exit_code);
-                        }
-                    }
-
-                    let all_entries = entries::load_entries(&labs_path);
-                    let query = args.args.join(" ");
-                    let height: usize = std::env::var("LAB_HEIGHT")
-                        .ok()
-                        .and_then(|v| v.parse().ok())
-                        .unwrap_or(24);
-                    let limit = std::cmp::max(height.saturating_sub(6), 3);
-
-                    let fuzz = fuzzy::Fuzzy::new(&all_entries);
-                    let _results = fuzz.match_entries(&query, limit);
-
-                    if args.and_exit {
-                        eprintln!("lab: TUI not yet implemented");
-                        process::exit(1);
-                    }
-                    eprintln!("lab: TUI selector not yet implemented");
-                    process::exit(1);
+                    let labs = labs_path.to_string_lossy().to_string();
+                    let exit_code = dispatch_exec(
+                        &args.args,
+                        &labs,
+                        args.and_exit,
+                        args.and_keys.as_deref(),
+                        args.and_type.as_deref(),
+                        args.and_confirm.as_deref(),
+                    );
+                    process::exit(exit_code);
                 }
             }
         }
