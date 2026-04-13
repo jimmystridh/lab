@@ -1,0 +1,50 @@
+{
+  "featureId": "tui-layout-rendering",
+  "reviewedAt": "2026-04-13T09:10:00.000Z",
+  "commitId": "86a7cd8ffb2cf3484d8e84fca10a41a8a7bf289a",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The implementation is thorough, well-structured, and fully covers all 13 expected behaviors from the feature specification. The renderer is cleanly layered: a SegmentStyleSpec/StyledSegment/StyledLine abstraction handles both ratatui Frame rendering and ANSI snapshot output via a single build_lines pipeline. Header (3 lines), body (height-5 rows, min 3), and footer (2 lines) layout is correct and consistent between render.rs body_height() and app.rs visible_result_limit(). Entry formatting correctly handles date-prefix dimming, fuzzy-match highlighting, symlink icons, right-aligned metadata with left-truncation, name truncation with ellipsis suppressing metadata, and selected-row background styling. Timestamp formatting and score formatting match the spec. 7 well-targeted unit tests plus the existing app.rs layout test cover the critical rendering paths. The custom char_width function is a reasonable alternative to adding the unicode-width crate dependency.",
+    "issues": [
+      {
+        "file": "src/tui/render.rs",
+        "line": 491,
+        "severity": "non_blocking",
+        "description": "char_width is a hand-rolled Unicode width calculator. It covers the most common ranges (CJK, Hangul, emoji, combining diacriticals, variation selectors) but may be incomplete for uncommon scripts (e.g., some CJK Unified Ideographs Extension B/C/D outside the 0x2E80-0xA4CF range). For directory names this is very unlikely to matter, but if broader internationalization becomes a concern, the unicode-width crate would be more complete."
+      },
+      {
+        "file": "src/tui/render.rs",
+        "line": 142,
+        "severity": "non_blocking",
+        "description": "The ANSI code for Highlight foreground in ansi_prefix() is '33' (standard ANSI yellow), while to_ratatui() uses Color::Yellow. These are equivalent for most terminals, but '33' maps to ANSI color 3 (yellow) while Color::Yellow in ratatui also maps to ANSI color 3 — so they are consistent. This is fine, just noting the two different color specification paths for awareness."
+      },
+      {
+        "file": "src/tui/render.rs",
+        "line": 363,
+        "severity": "non_blocking",
+        "description": "format_entry_name always renders the date prefix portion as muted, even if fuzzy match positions fall within the prefix characters (positions 0-10). This is intentional per the feature spec ('Date prefix portion rendered dim') but means date-prefix characters won't show highlight styling when matched. This is the correct behavior but worth documenting if the fuzzy engine's position output is later used for other purposes."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Worker deviated from TDD by writing implementation and tests in a single pass rather than red-green-refactor. Worker's rationale (existing renderer was scaffold with no meaningful behavior to preserve) is reasonable. The skill's suggested change — 'allow a single rewrite+test pass when replacing a scaffold' — is a practical amendment for scaffold-replacement scenarios.",
+      "evidence": "Handoff skillFeedback.followedProcedure=false, deviation on step '3. Write Tests First (TDD)', suggesting the skill add an exception for scaffold replacements."
+    },
+    {
+      "area": "conventions",
+      "observation": "The snapshot output format for --and-exit test mode now uses CURSOR_HOME (\\x1b[H) + CLEAR_TO_END_SCREEN (\\x1b[J) prefix followed by newline-delimited ANSI-styled lines written to stderr. This is a specific convention that spec tests depend on but is not documented in AGENTS.md or the test infrastructure section.",
+      "evidence": "src/tui/render.rs:21-22 defines CURSOR_HOME and CLEAR_TO_END_SCREEN constants; render_snapshot_with_colors() at line 198 uses them. Spec tests test_11_display.sh, test_17_line_layout.sh etc. depend on this format."
+    },
+    {
+      "area": "knowledge",
+      "observation": "The architecture.md mentions 'Metadata right-aligned via ratatui's Alignment::Right or manual padding' for the render approach. The actual implementation uses a custom compose_left_right function with manual space padding rather than ratatui's Alignment widget. The architecture doc already anticipates this alternative, so no update is strictly needed, but the current implementation has committed to the manual-padding approach exclusively.",
+      "evidence": ".factory/library/architecture.md render section mentions 'Alignment::Right or manual padding'; src/tui/render.rs compose_left_right() implements manual padding exclusively."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "The tui-layout-rendering feature is fully implemented and passes review. The 896-line render.rs rewrite introduces a clean StyledSegment/StyledLine abstraction that powers both ratatui interactive rendering and ANSI snapshot output. All 13 expected behaviors are covered: 3-line header with icon/title/path, separator lines, search input with reverse-video cursor, body entries with selection indicators/icons/dim date prefixes/fuzzy highlights/right-aligned metadata, timestamp formatting, score formatting, and a centered footer with keybinding hints. The body height calculation (height-5, min 3) is consistent between render.rs and app.rs. Test coverage includes 7 new render tests plus an app.rs layout consistency test. No blocking issues found; three non-blocking observations noted for awareness."
+}

@@ -1,0 +1,33 @@
+{
+  "featureId": "tui-search-filter",
+  "reviewedAt": "2026-04-13T09:15:00.000Z",
+  "commitId": "60de45aefb34784d1630283d8447388f6e4d2e8f",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The feature extracts key handling from tui/mod.rs into a dedicated tui/input.rs module and adds targeted unit tests for search input insertion/filtering, disallowed character rejection, and Enter selection. A render test for bold-yellow fuzzy highlight was also added to render.rs. The core filtering and rendering logic (insert_char with is_allowed_input_char gate, on_query_changed resetting cursor_pos, refresh_filtered via Fuzzy::match_entries, highlighted_name_segments with SegmentStyleSpec::highlight()) pre-existed from precondition features and is correctly wired. All expectedBehavior items are covered: allowed char set [a-zA-Z0-9-_. ] enforced, disallowed chars silently ignored, each keystroke triggers fuzzy re-evaluation, matched chars rendered bold yellow (Style bold + Color::Yellow / ANSI 1;33), non-matched chars normal style, date prefix always dim via SegmentStyleSpec::muted(), cursor_pos resets to 0 on input change, and case-insensitive matching delegated to the fuzzy engine. The refactor is clean — the moved functions are identical to their originals, imports are correctly updated, and mod.rs is properly simplified.",
+    "issues": [
+      {
+        "file": "src/tui/input.rs",
+        "line": 155,
+        "severity": "non_blocking",
+        "description": "test_disallowed_chars_are_silently_ignored only tests '/' as a disallowed character. It would be more thorough to also test characters like '@', '!', or non-ASCII input to ensure the full boundary of is_allowed_input_char is exercised from the key handler path. However, the underlying is_allowed_input_char function is deterministic and correct, so this is a test coverage suggestion, not a bug."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Worker deviated from rust-worker skill step 7 ('Verify with Spec Tests') by running a Python harness instead of 'bash spec/tests/runner.sh ./target/debug/lab'. Worker cited 'worker-mode safety guards' blocking inline Bash harness approach. The skill should document an alternative approach for running individual spec tests when the full runner.sh cannot be sourced directly, or the worker environment should allow running the spec test runner.",
+      "evidence": "Handoff skillFeedback.followedProcedure=false, deviations[0]: step '7. Verify with Spec Tests', used Python subprocess harness instead. Worker's suggestedChanges: 'Provide a supported command or helper for running individual sourced spec test files in worker mode.'"
+    },
+    {
+      "area": "conventions",
+      "observation": "The architecture.md documents filtered as Vec<(usize, f64, Vec<usize>)> tuple format, but the actual implementation uses a MatchResult struct with named fields (index, score, positions). The documentation should be updated to match the implementation.",
+      "evidence": "architecture.md TUI Architecture section: 'filtered: Vec<(usize, f64, Vec<usize>)> — (index, score, highlight_positions)' vs actual app.rs: 'pub filtered: Vec<MatchResult>' where MatchResult has fields {index, score, positions}."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Feature passes review. The commit cleanly extracts key handling into tui/input.rs with 3 well-structured unit tests, plus a render test confirming bold-yellow highlight ANSI output. All specified behaviors (char filtering, fuzzy re-evaluation on keystroke, highlight rendering, cursor reset, case-insensitive search) are correctly implemented via delegation to pre-existing app.rs and render.rs logic from precondition features. No blocking issues found. One non-blocking suggestion for broader disallowed-char test coverage. Two shared state observations: skill procedure gap for spec test execution in worker mode, and architecture.md documenting an outdated tuple format for filtered results."
+}

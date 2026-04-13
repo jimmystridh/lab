@@ -1,0 +1,39 @@
+{
+  "featureId": "tui-selection-create-new",
+  "reviewedAt": "2026-04-13T12:05:00.000Z",
+  "commitId": "a93f9decb3b23f8974f56a5392947b8ed8f50894",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The implementation correctly covers all core feature requirements: Enter on existing dir emits script_cd with exit 0, ESC/Ctrl-C silently exit with code 1, create-new appends a virtual entry with 📂 icon and YYYY-MM-DD-<input> name, spaces are collapsed to dashes via normalize_create_name_fragment, and the git-repo check routes create-new through script_worktree. Symlink entries correctly resolve to realpath via fs::canonicalize in load_entries (entries.rs). Tests are well-targeted, covering cancellation silence, create-new in git/non-git roots, whitespace collapse, and shell syntax validity. Two non-blocking issues identified.",
+    "issues": [
+      {
+        "file": "src/script.rs",
+        "line": 96,
+        "severity": "non_blocking",
+        "description": "Shell quoting regression in script_worktree: switching the sh -c wrapper from single quotes to double quotes means $repo is now expanded by the outer eval shell (shell.rs line 227: `eval \"$out\"`) before being passed to sh -c. Since $repo is set INSIDE the subshell, the outer shell expands it to empty string, making `git -C \"\" worktree add ...` use the wrong directory. The `|| true; exit 0` masks the failure, so the directory is still created and cd works, but the git worktree is NOT actually added. The old single-quote approach had a different issue (nested single-quoted paths could break with special characters), but correctly preserved $repo for the inner shell. A fix would be to escape the dollar sign: `\\\\\\\"\\\\$repo\\\\\\\"` in the Rust format string (producing `\\\"\\$repo\\\"` in output), preventing premature expansion."
+      },
+      {
+        "file": "src/tui/mod.rs",
+        "line": 45,
+        "severity": "non_blocking",
+        "description": "The `emit_message: bool` field on TuiOutcome::Cancelled is now dead code — every construction site sets it to false after this commit. The field should be removed to simplify the enum variant to a plain `Cancelled` unit variant, eliminating the unused struct field across 9 call sites."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Worker deviated from rust-worker skill step 7 ('Verify with Spec Tests') by running only the four feature-specific spec files instead of the full runner.sh suite. The deviation was justified — later spec tests exercise features from incomplete milestones. The skill should clarify that feature workers should run only the spec tests listed in the feature's verificationSteps when the full suite spans later incomplete milestones.",
+      "evidence": "Handoff skillFeedback.followedProcedure is false; deviations[0].step='7. Verify with Spec Tests', deviations[0].why explains later specs exercise pending features."
+    },
+    {
+      "area": "conventions",
+      "observation": "The TuiOutcome::Cancelled variant retains a dead `emit_message: bool` field after this commit changed all construction sites to always use false. AGENTS.md does not mention cleanup expectations for dead fields/code introduced during incremental feature work.",
+      "evidence": "grep for emit_message in src/ shows 9 occurrences, all setting emit_message: false. The field was originally used to print 'Cancelled.' to stdout, which conflicts with the IO discipline (stdout is for scripts only)."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Feature passes review. The implementation correctly covers entry selection (with symlink realpath resolution), silent ESC/Ctrl-C cancellation, create-new with date-prefixed names and whitespace normalization, and git-repo-aware worktree creation. Two non-blocking issues found: (1) a shell quoting regression in script_worktree where $repo gets prematurely expanded by the outer eval shell, silently preventing worktree creation (masked by || true), and (2) the emit_message field on TuiOutcome::Cancelled is now dead code. Test coverage is solid with 7 new unit tests across 4 files and 40/40 spec assertions passing."
+}

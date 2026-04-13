@@ -1,0 +1,33 @@
+{
+  "featureId": "tui-line-editing",
+  "reviewedAt": "2026-04-13T09:30:00.000Z",
+  "commitId": "8290ccb7815ba014af321c6214a525fc4250bc01",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The commit correctly completes the readline-style line editing feature by adding the missing Ctrl-H → Backspace mapping in input.rs and comprehensive regression tests for all readline key bindings (Ctrl-A/E/B/F cursor movement, Backspace/Ctrl-H deletion, Ctrl-K kill-to-end, Ctrl-W word-backward deletion). The test_keys.rs CTRL-H symbolic parsing was also added so --and-keys='CTRL-H' injects a Backspace event, matching real terminal semantics where 0x08 is backspace. The core App methods (move_input_to_start, move_input_to_end, move_input_back, move_input_forward, kill_to_end, delete_word_backward, backspace) were already implemented in app.rs from a prior commit; this commit rounds them out with the Ctrl-H handler and test coverage. All expectedBehavior items from the feature spec are satisfied: Ctrl-A/E/B/F cursor movement, Ctrl-K kill-to-end (explicitly NOT vim up), Ctrl-W word-backward delete, Backspace, and buffer-change-triggered filter re-evaluation are all tested and working. The implementation is clean, minimal, and follows existing code patterns.",
+    "issues": [
+      {
+        "file": "src/tui/input.rs",
+        "line": 388,
+        "severity": "non_blocking",
+        "description": "Test test_ctrl_w_deletes_previous_word_but_keeps_boundary_characters only tests Ctrl-W from the end of 'hello-world'. Edge cases like Ctrl-W with cursor mid-word, Ctrl-W on an all-punctuation buffer, or Ctrl-W at position 0 are not covered by handle_key-level tests (though the underlying App::delete_word_backward handles position 0 correctly via early return). These are minor gaps — not bugs — since the implementation logic is correct."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Worker deviated from skill step 7 (Verify with Spec Tests) by running only the two feature-scoped spec files (test_08_keyboard.sh, test_19_input_field.sh) instead of the full spec/tests/runner.sh suite. The deviation was justified: the full suite contains assertions for later TUI milestone features that haven't been implemented yet and would fail. The skill should clarify whether workers should run the full runner or only the feature-listed spec files when later milestone assertions are pending.",
+      "evidence": "Handoff skillFeedback.followedProcedure=false, deviations[0] explains running feature-scoped specs instead of full runner. Worker's suggestedChanges: 'Clarify in the rust-worker skill whether feature workers should run the full spec runner or only the feature-listed spec files when later milestone assertions are known to be pending.'"
+    },
+    {
+      "area": "conventions",
+      "observation": "Worker discovered .factory/init.sh is not executable (permission denied when run directly, works via 'bash .factory/init.sh'). This was noted as a discoveredIssue but not fixed since it's outside feature scope.",
+      "evidence": "Handoff discoveredIssues[0]: '.factory/init.sh exists but is not executable, so invoking it directly returns Permission denied (exit 126)'"
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "PASS. The commit cleanly completes the readline-style line editing feature. It adds the missing Ctrl-H → Backspace handler in input.rs, comprehensive regression tests for all 7 readline key bindings (Ctrl-A/E/B/F/H/K/W + Backspace), and CTRL-H symbolic parsing in test_keys.rs. All verification steps passed: 250 cargo tests, 26/26 spec assertions, and manual --and-keys flows confirmed correct behavior. No blocking issues found. One non-blocking observation: Ctrl-W test coverage could be broader but the underlying implementation is correct."
+}

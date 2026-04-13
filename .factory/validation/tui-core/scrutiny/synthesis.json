@@ -1,0 +1,75 @@
+{
+  "milestone": "tui-core",
+  "round": 1,
+  "status": "pass",
+  "validatorsRun": {
+    "test": { "passed": true, "command": "cargo test", "exitCode": 0 },
+    "typecheck": { "passed": true, "command": "cargo check", "exitCode": 0 },
+    "lint": { "passed": true, "command": "cargo clippy -- -D warnings", "exitCode": 0 }
+  },
+  "reviewsSummary": {
+    "total": 8,
+    "passed": 8,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Add TUI header title ('Try Directory Selection' → 'Lab Directory Selection') to the Renaming Guide table to prevent future branding misses.",
+      "evidence": "Feature fix-tui-title-branding was needed because the TUI header title was missed during initial renaming. The AGENTS.md renaming guide covers env vars, binary name, help text, and version but not the TUI title constant.",
+      "isSystemic": false
+    },
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Add a Testing section note: 'When running spec tests during a milestone, workers should run only the spec tests listed in their feature's verificationSteps, not the full runner.sh suite, because later-milestone assertions will fail.' This clarifies expectations for feature-scoped validation.",
+      "evidence": "Multiple workers (tui-line-editing, tui-selection-create-new, tui-sizes-styles, tui-search-filter) deviated from the skill's 'run spec tests' step by running feature-scoped tests only, because the full runner includes assertions for not-yet-implemented features from later milestones.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Update rust-worker skill step 7 ('Verify with Spec Tests') to clarify: 'Run only the spec tests listed in the feature's verificationSteps. If the full spec runner is used, failures from later-milestone features are expected and should not block the feature.' Also consider adding an exception to TDD step 3 for scaffold-replacement scenarios.",
+      "evidence": "5 of 8 tui-core workers deviated from the TDD step or spec-test step. Common pattern: (1) scaffold code already existed from preconditions, making red-green-refactor impractical; (2) full spec runner includes later-milestone assertions that naturally fail.",
+      "isSystemic": true
+    },
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Document the snapshot output format convention: '--and-exit renders to stderr using CURSOR_HOME (\\x1b[H) + CLEAR_TO_END_SCREEN (\\x1b[J) prefix followed by newline-delimited ANSI-styled lines.' This format is a dependency for all spec tests that parse TUI output.",
+      "evidence": "Feature tui-layout-rendering introduced this format and feature tui-sizes-styles modified it (adding CLEAR_TO_END_SCREEN). Neither AGENTS.md nor architecture.md documents this convention, despite spec tests depending on it.",
+      "isSystemic": false
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Raw ANSI escape constants vs crossterm execute! macros (tui-framework review): Worker used manual ANSI constants instead of crossterm's built-in commands.",
+      "reason": "This is an intentional implementation choice for deterministic test output, not a convention gap. The approach is consistent across all TUI code and works correctly."
+    },
+    {
+      "observation": "NO_COLORS AtomicBool propagation pattern not documented in architecture.md (tui-framework review).",
+      "reason": "This is an internal implementation detail. The environment.md already documents NO_COLOR as an env var. The AtomicBool is a standard Rust pattern for thread-safe global state and doesn't need explicit documentation."
+    },
+    {
+      "observation": "architecture.md documents filtered as Vec<(usize, f64, Vec<usize>)> tuple but implementation uses MatchResult struct (tui-search-filter review).",
+      "reason": "Architecture docs are planning artifacts and naturally drift from implementation. The MatchResult struct is self-documenting. Updating architecture.md for this is low-value since workers should reference actual code, not planning docs."
+    },
+    {
+      "observation": "char_width is hand-rolled vs unicode-width crate (tui-layout-rendering review).",
+      "reason": "This is a deliberate dependency minimization choice. The function covers the common cases needed for directory name display and is well-tested. Not a convention gap."
+    },
+    {
+      "observation": "TuiOutcome::Cancelled emit_message field is dead code (tui-selection-create-new review).",
+      "reason": "Non-blocking code cleanup that can be addressed in tui-actions milestone or as incidental work. Not a convention or shared state issue."
+    },
+    {
+      "observation": ".factory/init.sh is not executable (tui-line-editing review).",
+      "reason": "Already fixed in commit 557466b ('chore: make init script executable'). The issue was resolved within the milestone."
+    },
+    {
+      "observation": "Extra fs::read_dir syscall per entry for readability checking (tui-sizes-styles review).",
+      "reason": "Performance observation for typical LAB_PATH sizes (< 100 entries) is negligible. Not a convention or shared state issue."
+    }
+  ],
+  "previousRound": null
+}

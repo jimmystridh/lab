@@ -1,0 +1,39 @@
+{
+  "featureId": "tui-navigation-scrolling",
+  "reviewedAt": "2026-04-13T10:30:00.000Z",
+  "commitId": "9616a38",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Clean, well-structured implementation of TUI navigation and scrolling. All required key mappings (Down/Ctrl-N/Ctrl-J for down, Up/Ctrl-P for up, Home/End, PageUp/PageDown) are correctly wired. Boundary clamping uses saturating arithmetic to prevent underflow and .min(total-1) to prevent overflow. The kill_to_end no-op fix correctly prevents selection/scroll reset when Ctrl-K doesn't change the buffer. Scroll tracking via ensure_cursor_visible matches the spec formula. 8 new unit tests cover boundary clamping, scroll offset tracking, 50-downs-on-5-items contract, and no-op Ctrl-K stability. Spec test_13_vim_nav.sh was correctly updated to remove Ctrl-K as navigation (it's kill-to-end per AGENTS.md) and now asserts actual path changes rather than just checking for any cd output.",
+    "issues": [
+      {
+        "file": "src/tui/app.rs",
+        "line": 133,
+        "severity": "non_blocking",
+        "description": "Feature description specifies visible_count = min(filtered.len(), max(height-6, 3)) but implementation uses max(height-5, 3) without the min(filtered.len(), ...) wrapper. The height-5 value is correct for the actual layout (5 non-body rows: title, separator, search, separator, footer). The min(filtered.len()) omission is functionally harmless because cursor_pos is always clamped to total_items(), so scroll_offset computations remain correct even when filtered.len() < visible_result_limit(). This is a spec-description mismatch, not a code bug."
+      },
+      {
+        "file": "src/tui/input.rs",
+        "line": 133,
+        "severity": "non_blocking",
+        "description": "Duplicate make_scrolling_app helper function — identical definition exists in both app.rs (tests) and input.rs (tests). Minor test code duplication; could be extracted to a shared test utilities module but is not a functional issue."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Feature description says visible_count uses height-6 but the actual TUI layout has 5 non-body rows (title, separator, search, separator, footer), so the correct formula is height-5. The implementation correctly uses height-5. Future feature descriptions should reference the actual layout row count.",
+      "evidence": "src/tui/render.rs build_lines() produces 5 fixed lines + body_rows. body_height() at line 721 uses height.saturating_sub(5). app.rs visible_result_limit() at line 133 also uses height.saturating_sub(5). Feature description says 'max(height-6, 3)' which would be wrong for this layout."
+    },
+    {
+      "area": "skills",
+      "observation": "Worker followed the rust-worker skill procedure correctly. Skill feedback suggests clarifying how to report full-spec failures from pending milestone features when only the assigned feature's spec sections are expected to pass. This is a valid observation — the skill says 'Run spec tests and verify' but doesn't distinguish between feature-scoped vs full-suite expectations.",
+      "evidence": "Handoff skillFeedback.followedProcedure=true, suggestedChanges mentions spec failure reporting guidance. Worker's verification ran the full runner (exit 1) but correctly noted only the relevant sections (keyboard, vim-nav, scroll-behavior, navigation-edge) passed."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Feature tui-navigation-scrolling passes review. All key mappings, boundary clamping, scroll tracking, and selection reset behaviors are correctly implemented with comprehensive test coverage. The kill_to_end no-op fix is a valuable hardening that prevents accidental state resets. The vim-nav spec test was appropriately updated to reflect Ctrl-K's actual role (kill-to-end, not navigation). Two non-blocking observations: (1) the feature description's height-6 formula doesn't match the actual layout's height-5, and (2) test helper duplication across modules. No blocking issues found."
+}

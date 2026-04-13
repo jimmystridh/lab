@@ -1,0 +1,45 @@
+{
+  "featureId": "tui-framework",
+  "reviewedAt": "2026-04-13T10:15:00.000Z",
+  "commitId": "fca9be8bfd39ea854847f59467e3a5b2205dd946",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Solid implementation of the ratatui TUI framework on stderr. All required components are present: run_tui() with raw mode/alt screen on stderr via CrosstermBackend::new(io::stderr()), App struct with full state (entries, filtered, input, cursor_pos, scroll_offset, mode, marks, terminal_size), basic render function, and comprehensive TestKeySource with symbolic/raw/TYPE= parsing and auto-ESC. The architecture is clean with proper separation of concerns (mod.rs for orchestration, app.rs for state, render.rs for display, test_keys.rs for injection). TerminalSession uses a Drop impl for reliable cleanup. Two minor bugs were present at the commit but were fixed in subsequent commits by other features in the same milestone.",
+    "issues": [
+      {
+        "file": "src/tui/app.rs",
+        "line": 130,
+        "severity": "non_blocking",
+        "description": "visible_result_limit() uses saturating_sub(6) but the render layout has header (3 lines) + footer (2 lines) = 5 lines of chrome, making this off-by-one. The body gets one fewer row than available. Fixed in later commit 05e5b8c to saturating_sub(5)."
+      },
+      {
+        "file": "src/tui/app.rs",
+        "line": 320,
+        "severity": "non_blocking",
+        "description": "resolve_dimension() uses detected.max(default) when no override is set, which forces narrow terminals to minimum 80 columns / 24 rows even when the real terminal is smaller. This misrepresents the actual viewport and could cause rendering artifacts. Fixed in later commit 05e5b8c to use detected unless it's zero."
+      },
+      {
+        "file": "src/tui/test_keys.rs",
+        "line": 96,
+        "severity": "non_blocking",
+        "description": "CTRL-H is not mapped to Backspace in parse_ctrl_symbolic() at this commit. Traditionally Ctrl-H (0x08) is backspace, and the raw byte parser at line 133 does handle 0x08 as Backspace, but the symbolic CTRL-H path falls through to a generic Char('h') + CONTROL event which does nothing in handle_control_key(). Fixed in a later commit."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Worker used manual ANSI escape constants (ALT_SCREEN_ON/OFF, HIDE_CURSOR/SHOW_CURSOR) instead of crossterm's built-in execute!(stderr, EnterAlternateScreen) commands. This is a deliberate choice for deterministic test output but isn't documented as a project convention in AGENTS.md. Future workers might mix crossterm command macros with raw escapes.",
+      "evidence": "src/tui/mod.rs lines 49-52: const ALT_SCREEN_ON/OFF/HIDE_CURSOR/SHOW_CURSOR defined as raw escape strings, written via stderr.write_all() instead of crossterm::execute!()"
+    },
+    {
+      "area": "conventions",
+      "observation": "The render.rs module at the reviewed commit used NO_COLORS global atomic to conditionally apply styles, but the architecture.md documents this as just 'NO_COLOR' environment variable without specifying the global static pattern used to propagate it.",
+      "evidence": "src/tui/render.rs line 3: imports NO_COLORS from crate root; architecture.md Environment Variables table lists NO_COLOR but doesn't describe the AtomicBool propagation pattern"
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "The tui-framework feature is a well-structured implementation that fulfills all requirements: stderr-based ratatui rendering, App state management, test key injection with symbolic/raw/TYPE= parsing, auto-ESC on queue exhaustion, --and-exit single-frame render, --and-type input pre-fill, and LAB_WIDTH/LAB_HEIGHT overrides. Three non-blocking issues were found (off-by-one in visible_result_limit, resolve_dimension forcing minimum sizes, CTRL-H not mapped to backspace), all of which were fixed in subsequent commits within the same milestone. The worker followed the skill procedure, ran comprehensive verification (cargo test, clippy, spec tests, manual Python integration test), and produced clean code with good test coverage (6 test_keys tests + 7 app tests + cd integration tests). PASS."
+}

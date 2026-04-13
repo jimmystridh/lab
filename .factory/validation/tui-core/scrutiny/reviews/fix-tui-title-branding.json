@@ -1,0 +1,26 @@
+{
+  "featureId": "fix-tui-title-branding",
+  "reviewedAt": "2026-04-13T09:02:00.000Z",
+  "commitId": "25ad3ff6dd9439b22fd46d8aa317fa95f84598c2",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Clean, minimal branding rename across 4 files (1 Rust source constant + 1 unit test assertion + 3 shell spec test assertions). The TITLE constant in src/tui/render.rs was changed from \"Try Directory Selection\" to \"Lab Directory Selection\", and all corresponding test assertions were updated consistently. Ripgrep confirms zero remaining occurrences of \"Try Directory Selection\" or \"Try Selector\" in src/ and spec/tests/. No bugs or edge cases to flag — this is a straightforward string replacement with full test coverage maintained.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Worker deviated from strict TDD (step 3) by updating implementation and test assertions in one patch rather than red-green cycling. The deviation is justified: this was a one-line constant rename with pre-existing comprehensive coverage (unit test + 3 spec tests). The skill's suggested change to allow co-updating implementation and assertions for simple text changes is reasonable.",
+      "evidence": "handoff.skillFeedback.deviations[0]: 'Updated the title constant and the affected existing assertions in the same patch'. Feature is a single-constant rename with 4 pre-existing assertion sites."
+    },
+    {
+      "area": "conventions",
+      "observation": "AGENTS.md Renaming Guide covers env vars (TRY_PATH→LAB_PATH) and binary name (try→lab) but does not explicitly list the TUI header title ('Try Directory Selection'→'Lab Directory Selection'). This gap caused the branding to be missed initially. Consider adding user-visible UI strings to the renaming guide.",
+      "evidence": "AGENTS.md 'Renaming Guide (try → lab)' table lists binary, env vars, paths, shell function, help text, and version — but not the TUI header title constant. The feature description confirms this was a leftover from incomplete initial renaming."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Pass. The feature correctly renames all remaining 'Try Directory Selection'/'Try Selector' TUI header branding to 'Lab Directory Selection' across the Rust source constant, unit test, and three shell spec tests. All verification steps (cargo test, --and-exit output check, spec tests, ripgrep sweep) were run and passed. No code issues found."
+}

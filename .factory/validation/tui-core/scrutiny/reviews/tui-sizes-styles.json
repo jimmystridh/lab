@@ -1,0 +1,44 @@
+{
+  "featureId": "tui-sizes-styles",
+  "reviewedAt": "2026-04-13T12:15:00.000Z",
+  "commitId": "05e5b8c6650abb02b56d220894f747e4c05266a6",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Clean, focused implementation that correctly addresses all feature requirements. The resolve_dimension fix properly preserves actual detected terminal dimensions instead of flooring to 80x24. Resize handling now consistently applies LAB_WIDTH/LAB_HEIGHT overrides via the new from_detected() method. NO_COLOR rendering correctly strips SGR sequences while preserving cursor-home and clear-screen control codes. Permission-denied entries are silently skipped via fs::read_dir() probe. Truncated names preserve background styling on the ellipsis character. All 5 modified files are minimal and well-scoped. 4 new unit tests and 1 spec test adjustment are appropriate.",
+    "issues": [
+      {
+        "file": "src/entries.rs",
+        "line": 110,
+        "severity": "non_blocking",
+        "description": "The fs::read_dir() call adds an extra syscall per directory entry just to check readability. For typical LAB_PATH sizes this is negligible, but for very large directories it doubles I/O. An alternative would be to attempt read_dir once at the load_entries level and filter, but the current approach is simpler and correct."
+      },
+      {
+        "file": "src/entries.rs",
+        "line": 375,
+        "severity": "non_blocking",
+        "description": "test_load_entries_skips_unreadable_directories restores permissions after load_entries() but before assertions. If the test panics on an assertion before permission restoration, the tempdir destructor may fail to clean up the chmod-000 subdirectory. A RAII guard pattern would be more robust, but this is minor test hygiene."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "Worker did not follow TDD (skill step 3: Write Tests First). Instead inspected existing partial implementation first, identified gaps, then added regression tests alongside fixes. The deviation is justified because the feature area was already partially implemented and the worker needed to determine what remained to be done before writing targeted tests.",
+      "evidence": "Handoff skillFeedback.followedProcedure=false, deviation on step 3. The feature's precondition was 'tui-layout-rendering completed', meaning rendering code already existed."
+    },
+    {
+      "area": "skills",
+      "observation": "Worker suggests the skill should document that lower-scope TUI features may need to defer spec test assertions that depend on later milestones (e.g., delete-mode assertions in test_18). This is a valid insight — the test_18_rwrite_backgrounds.sh modification made the delete-mode check opportunistic specifically because delete-mode hasn't landed yet.",
+      "evidence": "Handoff skillFeedback.suggestedChanges[0]; spec/tests/test_18_rwrite_backgrounds.sh diff shows the marked-item check was made pass-through with comment 'Delete-mode visuals are verified more fully in test_16_delete.sh / tui-actions.'"
+    },
+    {
+      "area": "conventions",
+      "observation": "The snapshot rendering changed from just cursor-home to cursor-home + clear-to-end-of-screen (added \\x1b[J). This is a behavioral change that affects all snapshot-based test assertions. AGENTS.md doesn't mention the snapshot format convention, which could cause confusion for future features that check snapshot output.",
+      "evidence": "src/tui/render.rs diff: format changed from '\\x1b[H{lines}\\n' to '{CURSOR_HOME}{CLEAR_TO_END_SCREEN}{lines}\\n'"
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Pass. The implementation correctly addresses all 10 expected behaviors: standard 80x24 rendering, narrow/short/wide/tall terminal handling, SIGWINCH resize with consistent override logic, NO_COLOR SGR stripping with cursor control preservation, long name truncation with ellipsis and background styling, and permission-denied entry skipping. The code changes are minimal (136 additions, 23 deletions across 5 files), well-tested (4 new unit tests, spec test adjustment), and all verifications passed (262 unit tests, 5 spec scripts, manual checks for narrow/wide/no-color/permission). Two non-blocking issues noted: an extra syscall per entry for readability checking, and a minor test cleanup concern."
+}
