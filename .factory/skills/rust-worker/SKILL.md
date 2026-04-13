@@ -11,6 +11,11 @@ NOTE: Startup and cleanup are handled by `worker-base`. This skill defines the W
 
 All implementation features for the `lab` Rust CLI/TUI tool — CLI commands, fuzzy matching, TUI rendering, TUI actions, and spec test adaptation.
 
+## Precedence Rules
+
+1. When the validation contract assertions conflict with Ruby reference behavior, implement to the **validation contract** first. Note any divergence in your handoff.
+2. For scaffolding/setup features where spec tests are expected to fail initially, you may skip spec test runs but must explicitly note "spec tests skipped — expected to fail at this stage" in verification.
+
 ## Required Skills
 
 None. All verification uses cargo commands and shell scripts.
