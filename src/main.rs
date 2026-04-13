@@ -129,9 +129,9 @@ fn main() {
                     process::exit(exit_code);
                 }
                 Some(cli::Command::Worktree) => {
-                    // TODO: Implement in commands/worktree.rs
-                    eprintln!("lab: worktree command not yet implemented");
-                    process::exit(1);
+                    let exit_code =
+                        commands::worktree::cmd_worktree(&args.args, &labs_path.to_string_lossy());
+                    process::exit(exit_code);
                 }
                 Some(cli::Command::Exec) => {
                     // Sub-dispatch: exec clone → cmd_clone
@@ -146,6 +146,32 @@ fn main() {
                             &labs_path.to_string_lossy(),
                         );
                         process::exit(exit_code);
+                    }
+
+                    // Sub-dispatch: exec worktree → cmd_worktree
+                    if args.args.first().map(|s| s.as_str()) == Some("worktree") {
+                        let sub_args: Vec<String> =
+                            args.args.iter().skip(1).cloned().collect();
+                        let exit_code = commands::worktree::cmd_worktree(
+                            &sub_args,
+                            &labs_path.to_string_lossy(),
+                        );
+                        process::exit(exit_code);
+                    }
+
+                    // Dot shorthand: exec . [name] or exec ./subdir name
+                    if let Some(first) = args.args.first() {
+                        if first.starts_with('.') {
+                            let dot_arg = first.clone();
+                            let rest: Vec<String> =
+                                args.args.iter().skip(1).cloned().collect();
+                            let exit_code = commands::worktree::cmd_dot(
+                                &dot_arg,
+                                &rest,
+                                &labs_path.to_string_lossy(),
+                            );
+                            process::exit(exit_code);
+                        }
                     }
 
                     // URL shorthand: if first arg looks like git URI → clone
@@ -186,6 +212,36 @@ fn main() {
                 None => {
                     // Default: treat remaining args as search query → TUI selector
                     // Same as `lab exec [query]`
+
+                    // Dot shorthand: lab . [name] or lab ./subdir name
+                    if let Some(first) = args.args.first() {
+                        if first.starts_with('.') {
+                            let dot_arg = first.clone();
+                            let rest: Vec<String> =
+                                args.args.iter().skip(1).cloned().collect();
+                            let exit_code = commands::worktree::cmd_dot(
+                                &dot_arg,
+                                &rest,
+                                &labs_path.to_string_lossy(),
+                            );
+                            process::exit(exit_code);
+                        }
+                    }
+
+                    // URL shorthand: if first arg looks like git URI → clone
+                    if let Some(first) = args.args.first() {
+                        if git::is_git_uri(first) {
+                            let uri = Some(first.as_str());
+                            let custom_name = args.args.get(1).map(|s| s.as_str());
+                            let exit_code = commands::clone::cmd_clone(
+                                uri,
+                                custom_name,
+                                &labs_path.to_string_lossy(),
+                            );
+                            process::exit(exit_code);
+                        }
+                    }
+
                     let all_entries = entries::load_entries(&labs_path);
                     let query = args.args.join(" ");
                     let height: usize = std::env::var("LAB_HEIGHT")

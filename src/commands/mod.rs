@@ -6,3 +6,4 @@
 pub mod clone;
 pub mod init;
 pub mod install;
+pub mod worktree;
