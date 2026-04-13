@@ -10,7 +10,7 @@ pub mod render;
 pub mod test_keys;
 
 use self::{
-    app::{App, DeleteSelection, TerminalSize},
+    app::{App, DeleteSelection, RenameSelection, TerminalSize},
     input::handle_key,
     test_keys::TestKeySource,
 };
@@ -44,6 +44,8 @@ pub enum TuiOutcome {
     Create(PathBuf),
     /// Marked entries confirmed for deletion.
     Delete(DeleteSelection),
+    /// Rename confirmed for an existing entry.
+    Rename(RenameSelection),
     /// Selector cancelled without emitting a shell script.
     Cancelled,
 }

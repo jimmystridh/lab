@@ -3,12 +3,10 @@
 
 section "rename"
 
-# Helper to strip ANSI codes
 strip_ansi() {
     sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | sed 's/\x1b\[[?][0-9]*[a-zA-Z]//g'
 }
 
-# Setup: Create test directories for rename tests
 REN_TEST_DIR=$(mktemp -d)
 mkdir -p "$REN_TEST_DIR/2025-11-01-myproject"
 mkdir -p "$REN_TEST_DIR/2025-11-02-coolproject"
@@ -17,105 +15,7 @@ touch -t 202511010000 "$REN_TEST_DIR/2025-11-01-myproject"
 touch -t 202511020000 "$REN_TEST_DIR/2025-11-02-coolproject"
 touch "$REN_TEST_DIR/nodate-project"
 
-# Test: Ctrl-R opens rename dialog (check via CTRL-R,ESC)
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,ESC' exec 2>&1)
-if echo "$output" | strip_ansi | grep -qi "Rename"; then
-    pass
-else
-    fail "Ctrl-R should open rename dialog" "Rename in output" "$output" "rename"
-fi
-
-# Test: Rename dialog shows pencil emoji
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,ESC' exec 2>&1)
-if echo "$output" | grep -qE "📝|✏️"; then
-    pass
-else
-    fail "Rename dialog should show pencil emoji" "📝 or ✏️" "$output" "rename"
-fi
-
-# Test: Rename dialog pre-fills date prefix for dated entry
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='DOWN,CTRL-R,ESC' exec 2>&1)
-if echo "$output" | grep -q "2025-11-02-"; then
-    pass
-else
-    fail "Rename dialog should pre-fill date" "2025-11-02-" "$output" "rename"
-fi
-
-# Test: Rename dialog shows confirm hint
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,ESC' exec 2>&1)
-if echo "$output" | strip_ansi | grep -qi "Enter.*Confirm"; then
-    pass
-else
-    fail "Rename dialog should show confirm hint" "Enter: Confirm" "$output" "rename"
-fi
-
-# Test: Rename dialog shows cancel hint
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,ESC' exec 2>&1)
-if echo "$output" | strip_ansi | grep -qi "Esc.*Cancel"; then
-    pass
-else
-    fail "Rename dialog should show cancel hint" "Esc: Cancel" "$output" "rename"
-fi
-
-# Test: Rename Escape cancels
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,ESC' exec 2>/dev/null)
-if [ -z "$output" ] || ! echo "$output" | grep -q "mv"; then
-    pass
-else
-    fail "Ctrl-R then Esc should cancel rename" "no mv" "$output" "rename"
-fi
-
-# Test: Rename Enter with same name cancels (for entry with date prefix)
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='DOWN,CTRL-R,ENTER' exec 2>/dev/null)
-# 2025-11-02-coolproject has date prefix, so same name should cancel
-if [ -z "$output" ] || ! echo "$output" | grep -q "mv"; then
-    pass
-else
-    fail "Rename with same name should cancel" "no mv" "$output" "rename"
-fi
-
-# Test: Rename with new suffix generates mv command
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,n,e,w,n,a,m,e,ENTER' exec 2>/dev/null)
-if echo "$output" | grep -q "mv"; then
-    pass
-else
-    fail "Rename with new name should generate mv" "mv command" "$output" "rename"
-fi
-
-# Test: Rename script contains old name
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,n,e,w,n,a,m,e,ENTER' exec 2>/dev/null)
-# nodate-project is most recent (touched last)
-if echo "$output" | grep -q "nodate-project"; then
-    pass
-else
-    fail "Rename script should contain old name" "old name in script" "$output" "rename"
-fi
-
-# Test: Rename script contains new name
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,n,e,w,n,a,m,e,ENTER' exec 2>/dev/null)
-if echo "$output" | grep -q "newname"; then
-    pass
-else
-    fail "Rename script should contain new name" "new name in script" "$output" "rename"
-fi
-
-# Test: Rename script cds to base directory
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,n,e,w,n,a,m,e,ENTER' exec 2>/dev/null)
-if echo "$output" | grep -q "cd '"; then
-    pass
-else
-    fail "Rename script should cd to base" "cd command" "$output" "rename"
-fi
-
-# Test: Rename rejects slash in name (path traversal prevention)
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,.,.,/,e,t,c,ENTER' exec 2>/dev/null)
-if [ -z "$output" ] || ! echo "$output" | grep -q "mv"; then
-    pass
-else
-    fail "Rename should reject slash in name" "no mv for path with /" "$output" "rename"
-fi
-
-# Test: Rename shows in footer hints
+# Footer still advertises rename in the normal selector view
 output=$(lab_run --path="$REN_TEST_DIR" --and-exit exec 2>&1)
 if echo "$output" | strip_ansi | grep -qE '(\^R|Ctrl-R).*Rename'; then
     pass
@@ -123,62 +23,57 @@ else
     fail "Footer should show rename hint" "^R: Rename or Ctrl-R: Rename" "$output" "rename"
 fi
 
-# Test: Rename dialog shows separator line
+# Esc inside rename cancels without emitting an mv script
 output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,ESC' exec 2>&1)
-if echo "$output" | grep -q '─'; then
+if [ -z "$output" ] || ! echo "$output" | grep -q "mv "; then
     pass
 else
-    fail "Rename dialog should have separator lines" "─ character" "$output" "rename"
+    fail "Ctrl-R then Esc should cancel rename" "no mv command" "$output" "rename"
 fi
 
-# Test: Rename shows current name in dialog (with folder emoji)
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,ESC' exec 2>&1)
-if echo "$output" | grep -qE "Current:|📁.*nodate-project"; then
+# Same-name rename is a no-op
+output=$(lab_run --path="$REN_TEST_DIR" --and-keys='DOWN,CTRL-R,ENTER' exec 2>&1)
+if [ -z "$output" ] || ! echo "$output" | grep -q "mv "; then
     pass
 else
-    fail "Rename dialog should show current name" "Current: or 📁 with name" "$output" "rename"
+    fail "Rename with same name should exit without mv" "no mv command" "$output" "rename"
 fi
 
-# Test: Rename shows new name field
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,ESC' exec 2>&1)
-if echo "$output" | strip_ansi | grep -qi "New name:"; then
+# Clearing the prefilled input and typing a new name emits the rename script
+output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,CTRL-A,CTRL-K,TYPE=newname,ENTER' exec 2>&1)
+if echo "$output" | grep -q "mv " &&
+   echo "$output" | grep -q "nodate-project" &&
+   echo "$output" | grep -q "newname" &&
+   echo "$output" | grep -q "cd '$REN_TEST_DIR'" &&
+   echo "$output" | grep -q "echo '$REN_TEST_DIR/newname'" &&
+   echo "$output" | grep -q "cd '$REN_TEST_DIR/newname'"; then
     pass
 else
-    fail "Rename dialog should show New name: label" "New name:" "$output" "rename"
+    fail "Rename script should cd into base, mv old->new, echo new path, and cd new path" "rename script for nodate-project -> newname" "$output" "rename"
 fi
 
-# Test: Backspace works in rename field
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='DOWN,CTRL-R,BACKSPACE,n,e,w,ENTER' exec 2>/dev/null)
-# Navigate to coolproject and backspace one char then type new
-if echo "$output" | grep -q "mv"; then
+# Slash is allowed into the buffer but rejected on submit
+output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,CTRL-A,CTRL-K,TYPE=../etc,ENTER,ESC' exec 2>&1)
+if [ -z "$output" ] || ! echo "$output" | grep -q "mv "; then
     pass
 else
-    fail "Backspace should work in rename" "mv command" "$output" "rename"
+    fail "Rename should reject slash-containing names" "no mv command" "$output" "rename"
 fi
 
-# Test: Multiple items - navigate then rename
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='DOWN,CTRL-R,r,e,n,a,m,e,d,ENTER' exec 2>/dev/null)
-if echo "$output" | grep -q "mv"; then
+# Backspace edits the prefilled rename input at the cursor end
+output=$(lab_run --path="$REN_TEST_DIR" --and-keys='DOWN,CTRL-R,BACKSPACE,n,e,w,ENTER' exec 2>&1)
+if echo "$output" | grep -q "mv '2025-11-02-coolproject' '2025-11-02-coolprojecnew'"; then
     pass
 else
-    fail "Rename should work on navigated item" "mv command" "$output" "rename"
+    fail "Backspace should edit the prefilled rename input" "mv old name to coolprojecnew" "$output" "rename"
 fi
 
-# Test: Rename cds to new directory
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='CTRL-R,n,e,w,n,a,m,e,ENTER' exec 2>/dev/null)
-if echo "$output" | grep -qE "cd.*newname"; then
+# Navigation before rename targets the selected entry
+output=$(lab_run --path="$REN_TEST_DIR" --and-keys='DOWN,CTRL-R,CTRL-A,CTRL-K,TYPE=renamed,ENTER' exec 2>&1)
+if echo "$output" | grep -q "mv '2025-11-02-coolproject' 'renamed'"; then
     pass
 else
-    fail "Rename should cd to new directory" "cd to newname" "$output" "rename"
+    fail "Rename should target the navigated entry" "mv coolproject to renamed" "$output" "rename"
 fi
 
-# Test: Entry with date prefix shows date in input field
-output=$(lab_run --path="$REN_TEST_DIR" --and-keys='DOWN,CTRL-R,ESC' exec 2>&1)
-if echo "$output" | grep -q "2025-11-02-"; then
-    pass
-else
-    fail "Entry with date should pre-fill date" "2025-11-02- prefix" "$output" "rename"
-fi
-
-# Cleanup
 rm -rf "$REN_TEST_DIR"

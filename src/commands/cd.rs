@@ -71,6 +71,11 @@ fn commands_for_outcome(outcome: &TuiOutcome, labs_path: &Path) -> Option<Vec<St
             &selection.base_path.to_string_lossy(),
             &selection.basenames,
         )),
+        TuiOutcome::Rename(selection) => Some(script::script_rename(
+            &selection.base_path.to_string_lossy(),
+            &selection.old_name,
+            &selection.new_name,
+        )),
         TuiOutcome::Cancelled => None,
     }
 }
@@ -264,6 +269,30 @@ mod tests {
             commands[3].ends_with(&format!("|| cd '{}'", dir.path().to_string_lossy())),
             "expected restore command to fall back to labs path, got {:?}",
             commands[3]
+        );
+    }
+
+    #[test]
+    fn test_rename_outcome_uses_rename_script() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let commands = commands_for_outcome(
+            &TuiOutcome::Rename(crate::tui::app::RenameSelection {
+                base_path: dir.path().to_path_buf(),
+                old_name: "alpha".to_string(),
+                new_name: "beta".to_string(),
+            }),
+            dir.path(),
+        )
+        .expect("rename commands");
+
+        assert_eq!(
+            commands,
+            vec![
+                format!("cd '{}'", dir.path().to_string_lossy()),
+                "mv 'alpha' 'beta'".to_string(),
+                format!("echo '{}/beta'", dir.path().to_string_lossy()),
+                format!("cd '{}/beta'", dir.path().to_string_lossy()),
+            ]
         );
     }
 }

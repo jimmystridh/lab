@@ -1,4 +1,4 @@
-//! Delete confirmation dialog state and line-editing support.
+//! Dialog state and line-editing support for TUI modal dialogs.
 
 /// Editable state for the delete confirmation dialog.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -78,29 +78,112 @@ impl DeleteConfirmation {
             return;
         }
 
-        let chars: Vec<char> = self.input.chars().collect();
-        let mut new_cursor = self.cursor_pos;
-
-        while new_cursor > 0 && !chars[new_cursor - 1].is_ascii_alphanumeric() {
-            new_cursor -= 1;
-        }
-
-        while new_cursor > 0 && chars[new_cursor - 1].is_ascii_alphanumeric() {
-            new_cursor -= 1;
-        }
-
-        let start_byte = self.char_to_byte_pos(new_cursor);
-        let end_byte = self.char_to_byte_pos(self.cursor_pos);
-        self.input.replace_range(start_byte..end_byte, "");
-        self.cursor_pos = new_cursor;
+        delete_word_backward(&mut self.input, &mut self.cursor_pos);
     }
 
     fn char_to_byte_pos(&self, char_pos: usize) -> usize {
-        self.input
-            .char_indices()
-            .nth(char_pos)
-            .map(|(index, _)| index)
-            .unwrap_or(self.input.len())
+        char_to_byte_pos(&self.input, char_pos)
+    }
+}
+
+/// Editable state for the rename dialog.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenameDialog {
+    /// The currently selected entry basename before editing.
+    pub current_name: String,
+    /// Current editable rename input.
+    pub input: String,
+    /// Cursor position within the rename input, in chars.
+    pub cursor_pos: usize,
+    /// Current validation error, if any.
+    pub error: Option<String>,
+}
+
+impl RenameDialog {
+    /// Create a rename dialog pre-filled with the current entry basename.
+    pub fn new(current_name: impl Into<String>) -> Self {
+        let current_name = current_name.into();
+        let cursor_pos = current_name.chars().count();
+        Self {
+            input: current_name.clone(),
+            current_name,
+            cursor_pos,
+            error: None,
+        }
+    }
+
+    /// Insert an allowed rename character at the cursor.
+    pub fn insert_char(&mut self, character: char) {
+        if !is_allowed_rename_char(character) {
+            return;
+        }
+
+        let byte_pos = char_to_byte_pos(&self.input, self.cursor_pos);
+        self.input.insert(byte_pos, character);
+        self.cursor_pos += 1;
+        self.clear_error();
+    }
+
+    /// Delete the character before the cursor.
+    pub fn backspace(&mut self) {
+        if self.cursor_pos > 0 {
+            self.cursor_pos -= 1;
+            let byte_pos = char_to_byte_pos(&self.input, self.cursor_pos);
+            self.input.remove(byte_pos);
+        }
+        self.clear_error();
+    }
+
+    /// Move the cursor to the start of the input.
+    pub fn move_to_start(&mut self) {
+        self.cursor_pos = 0;
+    }
+
+    /// Move the cursor to the end of the input.
+    pub fn move_to_end(&mut self) {
+        self.cursor_pos = self.input.chars().count();
+    }
+
+    /// Move the cursor backward by one character.
+    pub fn move_back(&mut self) {
+        self.cursor_pos = self.cursor_pos.saturating_sub(1);
+    }
+
+    /// Move the cursor forward by one character.
+    pub fn move_forward(&mut self) {
+        self.cursor_pos = (self.cursor_pos + 1).min(self.input.chars().count());
+    }
+
+    /// Delete everything from the cursor to the end of the input.
+    pub fn kill_to_end(&mut self) {
+        let byte_pos = char_to_byte_pos(&self.input, self.cursor_pos);
+        if byte_pos < self.input.len() {
+            self.input.truncate(byte_pos);
+        }
+        self.clear_error();
+    }
+
+    /// Delete the previous word from the input.
+    pub fn delete_word_backward(&mut self) {
+        if self.cursor_pos > 0 {
+            delete_word_backward(&mut self.input, &mut self.cursor_pos);
+        }
+        self.clear_error();
+    }
+
+    /// Set the current validation error.
+    pub fn set_error(&mut self, error: impl Into<String>) {
+        self.error = Some(error.into());
+    }
+
+    /// Clear the current validation error.
+    pub fn clear_error(&mut self) {
+        self.error = None;
+    }
+
+    /// Return the normalized rename target used for validation and scripting.
+    pub fn normalized_name(&self) -> String {
+        self.input.split_whitespace().collect::<Vec<_>>().join("-")
     }
 }
 
@@ -108,9 +191,41 @@ fn is_printable(character: char) -> bool {
     !character.is_control()
 }
 
+fn is_allowed_rename_char(character: char) -> bool {
+    character.is_ascii_alphanumeric()
+        || matches!(character, '-' | '_' | '.' | '/')
+        || character.is_whitespace()
+}
+
+fn char_to_byte_pos(input: &str, char_pos: usize) -> usize {
+    input
+        .char_indices()
+        .nth(char_pos)
+        .map(|(index, _)| index)
+        .unwrap_or(input.len())
+}
+
+fn delete_word_backward(input: &mut String, cursor_pos: &mut usize) {
+    let chars: Vec<char> = input.chars().collect();
+    let mut new_cursor = *cursor_pos;
+
+    while new_cursor > 0 && !chars[new_cursor - 1].is_ascii_alphanumeric() {
+        new_cursor -= 1;
+    }
+
+    while new_cursor > 0 && chars[new_cursor - 1].is_ascii_alphanumeric() {
+        new_cursor -= 1;
+    }
+
+    let start_byte = char_to_byte_pos(input, new_cursor);
+    let end_byte = char_to_byte_pos(input, *cursor_pos);
+    input.replace_range(start_byte..end_byte, "");
+    *cursor_pos = new_cursor;
+}
+
 #[cfg(test)]
 mod tests {
-    use super::DeleteConfirmation;
+    use super::{DeleteConfirmation, RenameDialog};
 
     #[test]
     fn test_delete_confirmation_requires_exact_yes() {
@@ -164,5 +279,57 @@ mod tests {
         confirmation.kill_to_end();
         assert!(confirmation.input.is_empty());
         assert_eq!(confirmation.cursor_pos, 0);
+    }
+
+    #[test]
+    fn test_rename_dialog_prefills_current_name_and_places_cursor_at_end() {
+        let dialog = RenameDialog::new("2025-11-02-coolproject");
+
+        assert_eq!(dialog.current_name, "2025-11-02-coolproject");
+        assert_eq!(dialog.input, "2025-11-02-coolproject");
+        assert_eq!(dialog.cursor_pos, "2025-11-02-coolproject".chars().count());
+        assert_eq!(dialog.error, None);
+    }
+
+    #[test]
+    fn test_rename_dialog_allows_slash_but_rejects_other_disallowed_chars() {
+        let mut dialog = RenameDialog::new("alpha");
+        dialog.insert_char('/');
+        dialog.insert_char('!');
+
+        assert_eq!(dialog.input, "alpha/");
+        assert_eq!(dialog.cursor_pos, 6);
+    }
+
+    #[test]
+    fn test_rename_dialog_ctrl_style_editing_and_error_clearing() {
+        let mut dialog = RenameDialog::new("alpha project");
+        dialog.set_error("Name cannot be empty");
+
+        dialog.move_to_start();
+        dialog.move_forward();
+        dialog.kill_to_end();
+        assert_eq!(dialog.input, "a");
+        assert_eq!(dialog.cursor_pos, 1);
+        assert_eq!(dialog.error, None);
+
+        for character in " test".chars() {
+            dialog.insert_char(character);
+        }
+        dialog.delete_word_backward();
+        assert_eq!(dialog.input, "a ");
+        assert_eq!(dialog.cursor_pos, 2);
+
+        dialog.backspace();
+        assert_eq!(dialog.input, "a");
+        assert_eq!(dialog.cursor_pos, 1);
+    }
+
+    #[test]
+    fn test_rename_dialog_normalized_name_strips_and_replaces_whitespace() {
+        let mut dialog = RenameDialog::new("alpha");
+        dialog.input = "  new   name\tvalue  ".to_string();
+
+        assert_eq!(dialog.normalized_name(), "new-name-value");
     }
 }

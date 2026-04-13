@@ -249,6 +249,10 @@ fn render_snapshot_with_colors(app: &App, width: u16, height: u16, colors_enable
 }
 
 fn build_lines(app: &App, width: u16, height: u16) -> Vec<StyledLine> {
+    if app.is_renaming() {
+        return build_rename_dialog_lines(app, width, height);
+    }
+
     if app.is_confirming_delete() {
         return build_delete_confirmation_lines(app, width, height);
     }
@@ -436,6 +440,59 @@ fn build_delete_confirmation_lines(app: &App, width: u16, height: u16) -> Vec<St
     lines
 }
 
+fn build_rename_dialog_lines(app: &App, width: u16, height: u16) -> Vec<StyledLine> {
+    let body_rows = dialog_body_height(height);
+    let dialog = app.rename_dialog.as_ref();
+    let current_name = dialog
+        .map(|dialog| dialog.current_name.as_str())
+        .unwrap_or_default();
+    let input = dialog
+        .map(|dialog| dialog.input.as_str())
+        .unwrap_or_default();
+    let cursor_pos = dialog.map(|dialog| dialog.cursor_pos).unwrap_or(0);
+    let error = dialog.and_then(|dialog| dialog.error.as_deref());
+    let mut body = vec![
+        build_rename_current_line(current_name, width),
+        blank_line(width, Background::None),
+        blank_line(width, Background::None),
+        build_rename_prompt_line(input, cursor_pos, width),
+    ];
+
+    if let Some(error) = error {
+        body.push(blank_line(width, Background::None));
+        body.push(centered_line(
+            width,
+            error,
+            SegmentStyleSpec::normal().bold(),
+        ));
+    }
+
+    body.truncate(body_rows);
+    while body.len() < body_rows {
+        body.push(blank_line(width, Background::None));
+    }
+
+    let mut lines = Vec::with_capacity(body_rows + 4);
+    lines.push(centered_segments_line(
+        width,
+        vec![
+            StyledSegment::new("✏️", SegmentStyleSpec::normal()),
+            StyledSegment::new("  Rename directory", SegmentStyleSpec::accent()),
+        ],
+        Background::None,
+    ));
+    lines.push(separator_line(width));
+    lines.extend(body);
+    lines.push(separator_line(width));
+    lines.push(centered_line(
+        width,
+        "Enter: Confirm  Esc: Cancel",
+        SegmentStyleSpec::muted(),
+    ));
+
+    lines
+}
+
 fn build_delete_dialog_item_line(name: &str, width: u16) -> StyledLine {
     fill_line(
         width,
@@ -458,6 +515,24 @@ fn build_delete_prompt_line(app: &App, width: u16) -> StyledLine {
         "Type YES to confirm: ",
         SegmentStyleSpec::muted(),
     )];
+    segments.extend(input_segments(input, cursor_pos));
+    centered_segments_line(width, segments, Background::None)
+}
+
+fn build_rename_current_line(current_name: &str, width: u16) -> StyledLine {
+    fill_line(
+        width,
+        vec![
+            StyledSegment::new("📁", SegmentStyleSpec::normal()),
+            StyledSegment::new(" ", SegmentStyleSpec::normal()),
+            StyledSegment::new(current_name, SegmentStyleSpec::normal()),
+        ],
+        Background::None,
+    )
+}
+
+fn build_rename_prompt_line(input: &str, cursor_pos: usize, width: u16) -> StyledLine {
+    let mut segments = vec![StyledSegment::new("New name: ", SegmentStyleSpec::muted())];
     segments.extend(input_segments(input, cursor_pos));
     centered_segments_line(width, segments, Background::None)
 }
@@ -1091,6 +1166,61 @@ mod tests {
             .iter()
             .any(|line| line.contains("Type YES to confirm: ")));
         assert!(rendered.contains("YES\x1b[7m \x1b[0m"));
+    }
+
+    #[test]
+    fn test_rename_dialog_renders_title_current_name_and_prefilled_input() {
+        let mut app = make_app(
+            vec![make_entry("2025-11-29-project", false, SystemTime::now())],
+            80,
+            8,
+            None,
+        );
+        app.filtered = vec![MatchResult {
+            index: 0,
+            score: 3.0,
+            positions: Vec::new(),
+        }];
+        app.begin_rename();
+
+        let rendered = snapshot(&app, true);
+        let lines = rendered.lines().collect::<Vec<_>>();
+
+        assert!(lines[0].contains("✏️"));
+        assert!(lines[0].contains("Rename directory"));
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("📁 2025-11-29-project")));
+        assert!(lines.iter().any(|line| line.contains("New name: ")));
+        assert!(rendered.contains("2025-11-29-project\x1b[7m \x1b[0m"));
+        assert!(lines
+            .last()
+            .is_some_and(|line| line.contains("Enter: Confirm  Esc: Cancel")));
+    }
+
+    #[test]
+    fn test_rename_dialog_renders_validation_error() {
+        let mut app = make_app(
+            vec![make_entry("alpha", false, SystemTime::now())],
+            80,
+            10,
+            None,
+        );
+        app.filtered = vec![MatchResult {
+            index: 0,
+            score: 3.0,
+            positions: Vec::new(),
+        }];
+        app.begin_rename();
+        if let Some(dialog) = app.rename_dialog.as_mut() {
+            dialog.input.clear();
+            dialog.cursor_pos = 0;
+            dialog.set_error("Name cannot be empty");
+        }
+
+        let rendered = snapshot(&app, true);
+
+        assert!(rendered.contains("Name cannot be empty"));
     }
 
     #[test]

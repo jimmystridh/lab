@@ -13,6 +13,10 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Handle a single key event for the selector.
 pub fn handle_key(app: &mut App, key: KeyEvent) -> Option<TuiOutcome> {
+    if app.is_renaming() {
+        return handle_rename_key(app, key);
+    }
+
     if app.is_confirming_delete() {
         return handle_delete_confirmation_key(app, key);
     }
@@ -64,6 +68,31 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Option<TuiOutcome> {
         }
         KeyCode::Char(character) if key.modifiers.contains(KeyModifiers::CONTROL) => {
             handle_control_key(app, character)
+        }
+        KeyCode::Char(character) => {
+            app.insert_char(character);
+            None
+        }
+        _ => None,
+    }
+}
+
+fn handle_rename_key(app: &mut App, key: KeyEvent) -> Option<TuiOutcome> {
+    match key.code {
+        KeyCode::Enter => match app.submit_rename() {
+            Ok(Some(selection)) => Some(TuiOutcome::Rename(selection)),
+            Ok(None) | Err(_) => None,
+        },
+        KeyCode::Esc => {
+            app.cancel_rename();
+            None
+        }
+        KeyCode::Backspace => {
+            app.backspace();
+            None
+        }
+        KeyCode::Char(character) if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            handle_rename_control_key(app, character)
         }
         KeyCode::Char(character) => {
             app.insert_char(character);
@@ -155,6 +184,48 @@ fn handle_control_key(app: &mut App, character: char) -> Option<TuiOutcome> {
         }
         'p' => {
             app.move_up();
+            None
+        }
+        'r' => {
+            app.begin_rename();
+            None
+        }
+        'w' => {
+            app.delete_word_backward();
+            None
+        }
+        _ => None,
+    }
+}
+
+fn handle_rename_control_key(app: &mut App, character: char) -> Option<TuiOutcome> {
+    match character.to_ascii_lowercase() {
+        'a' => {
+            app.move_input_to_start();
+            None
+        }
+        'b' => {
+            app.move_input_back();
+            None
+        }
+        'c' => {
+            app.cancel_rename();
+            None
+        }
+        'e' => {
+            app.move_input_to_end();
+            None
+        }
+        'f' => {
+            app.move_input_forward();
+            None
+        }
+        'h' => {
+            app.backspace();
+            None
+        }
+        'k' => {
+            app.kill_to_end();
             None
         }
         'w' => {
@@ -403,6 +474,158 @@ mod tests {
         )
         .is_none());
         assert!(app.marks.is_empty());
+    }
+
+    #[test]
+    fn test_ctrl_r_opens_rename_dialog_with_prefilled_name() {
+        let mut app = make_app(None);
+        app.move_down();
+
+        let outcome = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL),
+        );
+
+        assert!(outcome.is_none());
+        assert!(app.is_renaming());
+        let dialog = app.rename_dialog.as_ref().expect("rename dialog");
+        assert_eq!(dialog.current_name, "2025-11-15-beta");
+        assert_eq!(dialog.input, "2025-11-15-beta");
+        assert_eq!(dialog.cursor_pos, 15);
+    }
+
+    #[test]
+    fn test_ctrl_r_on_create_new_row_does_nothing() {
+        let mut app = App::new(
+            "/tmp/labs",
+            Vec::new(),
+            Some("new project"),
+            TerminalSize::new(80, 24),
+        );
+
+        let outcome = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL),
+        );
+
+        assert!(outcome.is_none());
+        assert!(!app.is_renaming());
+    }
+
+    #[test]
+    fn test_rename_enter_with_same_name_closes_dialog_without_outcome() {
+        let mut app = make_app(None);
+        app.begin_rename();
+
+        let outcome = handle_key(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert!(outcome.is_none());
+        assert!(!app.is_renaming());
+    }
+
+    #[test]
+    fn test_rename_escape_and_ctrl_c_cancel_dialog_without_exiting_selector() {
+        for key in [
+            KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+        ] {
+            let mut app = make_app(None);
+            app.begin_rename();
+
+            let outcome = handle_key(&mut app, key);
+
+            assert!(outcome.is_none());
+            assert!(!app.is_renaming());
+        }
+    }
+
+    #[test]
+    fn test_rename_enter_with_changes_returns_rename_outcome() {
+        let mut app = make_app(None);
+        app.move_down();
+        app.begin_rename();
+        app.move_input_to_end();
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE),
+        )
+        .is_none());
+
+        let outcome = handle_key(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert_eq!(
+            outcome,
+            Some(TuiOutcome::Rename(crate::tui::app::RenameSelection {
+                base_path: PathBuf::from("/tmp/labs"),
+                old_name: "2025-11-15-beta".to_string(),
+                new_name: "2025-11-15-betax".to_string(),
+            }))
+        );
+    }
+
+    #[test]
+    fn test_rename_validation_error_stays_in_dialog() {
+        let mut app = make_app(None);
+        app.begin_rename();
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('k'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+
+        let outcome = handle_key(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert!(outcome.is_none());
+        assert!(app.is_renaming());
+        assert_eq!(
+            app.rename_dialog
+                .as_ref()
+                .and_then(|dialog| dialog.error.clone()),
+            Some("Name cannot be empty".to_string())
+        );
+    }
+
+    #[test]
+    fn test_rename_line_editing_uses_ctrl_bindings() {
+        let mut app = make_app(None);
+        app.begin_rename();
+
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('k'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        for character in "new name".chars() {
+            assert!(handle_key(
+                &mut app,
+                KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE),
+            )
+            .is_none());
+        }
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('/'), KeyModifiers::NONE),
+        )
+        .is_none());
+
+        let dialog = app.rename_dialog.as_ref().expect("rename dialog");
+        assert_eq!(dialog.input, "new /");
+        assert_eq!(dialog.cursor_pos, 5);
     }
 
     #[test]

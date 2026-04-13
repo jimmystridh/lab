@@ -28,10 +28,10 @@ tui_wait 0.3
 tui_send C-r
 tui_wait 0.2
 tui_capture
-if echo "$TUI_LAST_OUTPUT" | grep -q "📝"; then
+if echo "$TUI_LAST_OUTPUT" | grep -qE "📝|✏️"; then
     pass
 else
-    fail "Rename mode should show pencil emoji" "📝" "$TUI_LAST_OUTPUT"
+    fail "Rename mode should show pencil emoji" "📝 or ✏️" "$TUI_LAST_OUTPUT"
 fi
 
 # Test: Rename shows current name

@@ -4,7 +4,7 @@
 //! handling: loaded entries, current filter results, input buffer, selection,
 //! scroll position, mode, delete marks, and terminal size.
 
-use super::dialogs::DeleteConfirmation;
+use super::dialogs::{DeleteConfirmation, RenameDialog};
 use crate::{
     entries::Entry,
     fuzzy::{Fuzzy, MatchResult},
@@ -59,6 +59,8 @@ pub enum Mode {
     Normal,
     /// Delete confirmation dialog.
     DeleteConfirm,
+    /// Rename dialog.
+    Rename,
 }
 
 /// Selection outcome derived from the current cursor position.
@@ -77,6 +79,17 @@ pub struct DeleteSelection {
     pub base_path: PathBuf,
     /// Basenames to delete relative to `base_path`.
     pub basenames: Vec<String>,
+}
+
+/// Confirmed rename selection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenameSelection {
+    /// Base labs path containing the entry being renamed.
+    pub base_path: PathBuf,
+    /// Original basename before the rename.
+    pub old_name: String,
+    /// New basename after normalization and validation.
+    pub new_name: String,
 }
 
 /// Full TUI application state.
@@ -103,6 +116,8 @@ pub struct App {
     pub marks: HashSet<usize>,
     /// Delete confirmation dialog state when active.
     pub delete_confirmation: Option<DeleteConfirmation>,
+    /// Rename dialog state when active.
+    pub rename_dialog: Option<RenameDialog>,
     /// Current terminal dimensions.
     pub terminal_size: TerminalSize,
 }
@@ -131,6 +146,7 @@ impl App {
             mode: Mode::Normal,
             marks: HashSet::new(),
             delete_confirmation: None,
+            rename_dialog: None,
             terminal_size: size,
         };
         app.refresh_filtered();
@@ -202,6 +218,11 @@ impl App {
         self.mode == Mode::DeleteConfirm
     }
 
+    /// Whether the rename dialog is active.
+    pub fn is_renaming(&self) -> bool {
+        self.mode == Mode::Rename
+    }
+
     /// Return the number of marked entries.
     pub fn marked_count(&self) -> usize {
         self.marks.len()
@@ -270,6 +291,60 @@ impl App {
         selection
     }
 
+    /// Enter the rename dialog for the currently selected real entry.
+    pub fn begin_rename(&mut self) {
+        let Some(index) = self.current_entry_index() else {
+            return;
+        };
+
+        self.clear_delete_marks();
+        self.mode = Mode::Rename;
+        self.rename_dialog = Some(RenameDialog::new(self.entries[index].name.clone()));
+    }
+
+    /// Cancel the active rename dialog, if any.
+    pub fn cancel_rename(&mut self) {
+        self.mode = Mode::Normal;
+        self.rename_dialog = None;
+    }
+
+    /// Validate and submit the active rename dialog.
+    pub fn submit_rename(&mut self) -> Result<Option<RenameSelection>, String> {
+        if !self.is_renaming() {
+            return Ok(None);
+        }
+
+        let Some(dialog) = self.rename_dialog.as_ref() else {
+            self.mode = Mode::Normal;
+            return Ok(None);
+        };
+
+        let old_name = dialog.current_name.clone();
+        let new_name = dialog.normalized_name();
+
+        if new_name.is_empty() {
+            return self.rename_error("Name cannot be empty");
+        }
+        if new_name.contains('/') {
+            return self.rename_error("Name cannot contain /");
+        }
+        if new_name == old_name {
+            self.cancel_rename();
+            return Ok(None);
+        }
+        if self.labs_path.join(&new_name).is_dir() {
+            return self.rename_error(format!("Directory exists: {new_name}"));
+        }
+
+        let selection = RenameSelection {
+            base_path: self.labs_path.clone(),
+            old_name,
+            new_name,
+        };
+        self.cancel_rename();
+        Ok(Some(selection))
+    }
+
     /// Move the selection down one row, clamped at the end.
     pub fn move_down(&mut self) {
         let total = self.total_items();
@@ -316,6 +391,13 @@ impl App {
 
     /// Insert a printable character into the input buffer.
     pub fn insert_char(&mut self, character: char) {
+        if self.is_renaming() {
+            if let Some(dialog) = self.rename_dialog.as_mut() {
+                dialog.insert_char(character);
+            }
+            return;
+        }
+
         if self.is_confirming_delete() {
             if let Some(dialog) = self.delete_confirmation.as_mut() {
                 dialog.insert_char(character);
@@ -335,6 +417,13 @@ impl App {
 
     /// Delete the character before the input cursor.
     pub fn backspace(&mut self) {
+        if self.is_renaming() {
+            if let Some(dialog) = self.rename_dialog.as_mut() {
+                dialog.backspace();
+            }
+            return;
+        }
+
         if self.is_confirming_delete() {
             if let Some(dialog) = self.delete_confirmation.as_mut() {
                 dialog.backspace();
@@ -354,6 +443,13 @@ impl App {
 
     /// Move the input cursor to the start.
     pub fn move_input_to_start(&mut self) {
+        if self.is_renaming() {
+            if let Some(dialog) = self.rename_dialog.as_mut() {
+                dialog.move_to_start();
+            }
+            return;
+        }
+
         if self.is_confirming_delete() {
             if let Some(dialog) = self.delete_confirmation.as_mut() {
                 dialog.move_to_start();
@@ -366,6 +462,13 @@ impl App {
 
     /// Move the input cursor to the end.
     pub fn move_input_to_end(&mut self) {
+        if self.is_renaming() {
+            if let Some(dialog) = self.rename_dialog.as_mut() {
+                dialog.move_to_end();
+            }
+            return;
+        }
+
         if self.is_confirming_delete() {
             if let Some(dialog) = self.delete_confirmation.as_mut() {
                 dialog.move_to_end();
@@ -378,6 +481,13 @@ impl App {
 
     /// Move the input cursor back one character.
     pub fn move_input_back(&mut self) {
+        if self.is_renaming() {
+            if let Some(dialog) = self.rename_dialog.as_mut() {
+                dialog.move_back();
+            }
+            return;
+        }
+
         if self.is_confirming_delete() {
             if let Some(dialog) = self.delete_confirmation.as_mut() {
                 dialog.move_back();
@@ -390,6 +500,13 @@ impl App {
 
     /// Move the input cursor forward one character.
     pub fn move_input_forward(&mut self) {
+        if self.is_renaming() {
+            if let Some(dialog) = self.rename_dialog.as_mut() {
+                dialog.move_forward();
+            }
+            return;
+        }
+
         if self.is_confirming_delete() {
             if let Some(dialog) = self.delete_confirmation.as_mut() {
                 dialog.move_forward();
@@ -402,6 +519,13 @@ impl App {
 
     /// Delete from the input cursor to the end of the line.
     pub fn kill_to_end(&mut self) {
+        if self.is_renaming() {
+            if let Some(dialog) = self.rename_dialog.as_mut() {
+                dialog.kill_to_end();
+            }
+            return;
+        }
+
         if self.is_confirming_delete() {
             if let Some(dialog) = self.delete_confirmation.as_mut() {
                 dialog.kill_to_end();
@@ -420,6 +544,13 @@ impl App {
 
     /// Delete the previous word from the input buffer.
     pub fn delete_word_backward(&mut self) {
+        if self.is_renaming() {
+            if let Some(dialog) = self.rename_dialog.as_mut() {
+                dialog.delete_word_backward();
+            }
+            return;
+        }
+
         if self.is_confirming_delete() {
             if let Some(dialog) = self.delete_confirmation.as_mut() {
                 dialog.delete_word_backward();
@@ -536,6 +667,17 @@ impl App {
             .nth(char_pos)
             .map(|(index, _)| index)
             .unwrap_or(self.input.len())
+    }
+
+    fn rename_error(
+        &mut self,
+        message: impl Into<String>,
+    ) -> Result<Option<RenameSelection>, String> {
+        let message = message.into();
+        if let Some(dialog) = self.rename_dialog.as_mut() {
+            dialog.set_error(message.clone());
+        }
+        Err(message)
     }
 }
 
@@ -913,5 +1055,141 @@ mod tests {
         assert!(app.submit_delete_confirmation().is_none());
         assert!(app.marks.is_empty());
         assert_eq!(app.mode, Mode::Normal);
+    }
+
+    #[test]
+    fn test_begin_rename_prefills_current_name_and_clears_delete_marks() {
+        let mut app = make_app(None);
+        app.move_down();
+        app.toggle_delete_mark();
+
+        app.begin_rename();
+
+        assert!(app.marks.is_empty());
+        assert!(app.is_renaming());
+        let dialog = app.rename_dialog.as_ref().expect("rename dialog");
+        assert_eq!(dialog.current_name, "beta");
+        assert_eq!(dialog.input, "beta");
+        assert_eq!(dialog.cursor_pos, 4);
+    }
+
+    #[test]
+    fn test_begin_rename_on_create_new_row_does_nothing() {
+        let mut app = App::new(
+            "/tmp/labs",
+            Vec::new(),
+            Some("new project"),
+            TerminalSize::new(80, 24),
+        );
+
+        app.begin_rename();
+
+        assert!(!app.is_renaming());
+        assert!(app.rename_dialog.is_none());
+    }
+
+    #[test]
+    fn test_submit_rename_same_name_exits_dialog_without_selection() {
+        let mut app = make_app(None);
+        app.begin_rename();
+
+        let result = app.submit_rename().expect("rename result");
+
+        assert!(result.is_none());
+        assert!(!app.is_renaming());
+        assert!(app.rename_dialog.is_none());
+    }
+
+    #[test]
+    fn test_submit_rename_rejects_empty_name_and_stays_in_dialog() {
+        let mut app = make_app(None);
+        app.begin_rename();
+        app.move_input_to_start();
+        app.kill_to_end();
+
+        let error = app.submit_rename().expect_err("rename error");
+
+        assert_eq!(error, "Name cannot be empty");
+        assert!(app.is_renaming());
+        assert_eq!(
+            app.rename_dialog
+                .as_ref()
+                .and_then(|dialog| dialog.error.clone()),
+            Some("Name cannot be empty".to_string())
+        );
+    }
+
+    #[test]
+    fn test_submit_rename_normalizes_spaces_to_dashes() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let entry = Entry {
+            name: "alpha".to_string(),
+            path: dir.path().join("alpha"),
+            is_symlink: false,
+            mtime: SystemTime::now(),
+            base_score: 1.0,
+        };
+        let mut app = App::new(dir.path(), vec![entry], None, TerminalSize::new(80, 24));
+        app.begin_rename();
+        app.move_input_to_start();
+        app.kill_to_end();
+        for character in "new  name".chars() {
+            app.insert_char(character);
+        }
+
+        let selection = app
+            .submit_rename()
+            .expect("rename result")
+            .expect("rename selection");
+
+        assert_eq!(selection.old_name, "alpha");
+        assert_eq!(selection.new_name, "new-name");
+        assert_eq!(selection.base_path, dir.path());
+        assert!(!app.is_renaming());
+    }
+
+    #[test]
+    fn test_submit_rename_rejects_existing_directory_name() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::create_dir(dir.path().join("alpha")).expect("mkdir alpha");
+        fs::create_dir(dir.path().join("beta")).expect("mkdir beta");
+        let mut app = App::new(
+            dir.path(),
+            vec![
+                Entry {
+                    name: "alpha".to_string(),
+                    path: dir.path().join("alpha"),
+                    is_symlink: false,
+                    mtime: SystemTime::now(),
+                    base_score: 2.0,
+                },
+                Entry {
+                    name: "beta".to_string(),
+                    path: dir.path().join("beta"),
+                    is_symlink: false,
+                    mtime: SystemTime::now(),
+                    base_score: 1.0,
+                },
+            ],
+            None,
+            TerminalSize::new(80, 24),
+        );
+        app.begin_rename();
+        app.move_input_to_start();
+        app.kill_to_end();
+        for character in "beta".chars() {
+            app.insert_char(character);
+        }
+
+        let error = app.submit_rename().expect_err("rename error");
+
+        assert_eq!(error, "Directory exists: beta");
+        assert!(app.is_renaming());
+        assert_eq!(
+            app.rename_dialog
+                .as_ref()
+                .and_then(|dialog| dialog.error.clone()),
+            Some("Directory exists: beta".to_string())
+        );
     }
 }

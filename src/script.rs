@@ -5,7 +5,7 @@
 //! commands chained with `&& \`, and 2-space indented continuations.
 
 use crate::util::quote_path;
-use std::env;
+use std::{env, path::Path};
 
 /// Warning comment emitted as the first line of every script.
 /// If the user sees this, they invoked `lab` directly instead of through the shell alias.
@@ -150,6 +150,22 @@ pub fn script_delete(base_path: &str, basenames: &[String]) -> Vec<String> {
         quote_path(base_path)
     ));
     cmds
+}
+
+/// Build commands for renaming a selected lab directory.
+///
+/// The script changes into the labs base path, renames the selected basename
+/// with `mv`, echoes the new absolute path, and finally cds into the new path.
+pub fn script_rename(base_path: &str, old_name: &str, new_name: &str) -> Vec<String> {
+    let new_path = Path::new(base_path).join(new_name);
+    let new_path = new_path.to_string_lossy().into_owned();
+
+    vec![
+        format!("cd {}", quote_path(base_path)),
+        format!("mv {} {}", quote_path(old_name), quote_path(new_name)),
+        format!("echo {}", quote_path(&new_path)),
+        format!("cd {}", quote_path(&new_path)),
+    ]
 }
 
 #[cfg(test)]
@@ -578,6 +594,46 @@ mod tests {
         assert_eq!(lines[2], "  test -d 'project' && rm -rf 'project' && \\");
         assert!(lines[3].starts_with("  cd '"));
         assert!(lines[3].ends_with("' 2>/dev/null || cd '/tmp/labs'"));
+    }
+
+    #[test]
+    fn test_script_rename_basic() {
+        let cmds = script_rename("/tmp/labs", "2025-11-01-alpha", "2025-11-01-beta");
+
+        assert_eq!(
+            cmds,
+            vec![
+                "cd '/tmp/labs'".to_string(),
+                "mv '2025-11-01-alpha' '2025-11-01-beta'".to_string(),
+                "echo '/tmp/labs/2025-11-01-beta'".to_string(),
+                "cd '/tmp/labs/2025-11-01-beta'".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_script_rename_quotes_names_and_does_not_touch() {
+        let cmds = script_rename("/tmp/lab root", "it's old", "new name");
+
+        assert_eq!(cmds[0], "cd '/tmp/lab root'");
+        assert_eq!(cmds[1], "mv 'it'\"'\"'s old' 'new name'");
+        assert_eq!(cmds[2], "echo '/tmp/lab root/new name'");
+        assert_eq!(cmds[3], "cd '/tmp/lab root/new name'");
+        assert!(cmds.iter().all(|command| !command.starts_with("touch ")));
+    }
+
+    #[test]
+    fn test_rename_script_full_output() {
+        let cmds = script_rename("/tmp/labs", "old", "new");
+        let output = capture_emit_script(&cmds);
+        let lines: Vec<&str> = output.lines().collect();
+
+        assert_eq!(lines.len(), 5);
+        assert_eq!(lines[0], SCRIPT_WARNING);
+        assert_eq!(lines[1], "cd '/tmp/labs' && \\");
+        assert_eq!(lines[2], "  mv 'old' 'new' && \\");
+        assert_eq!(lines[3], "  echo '/tmp/labs/new' && \\");
+        assert_eq!(lines[4], "  cd '/tmp/labs/new'");
     }
 
     // ---- Integration: emit_script with script builders ----
