@@ -1,147 +1,720 @@
-//! Basic ratatui rendering for the `lab` selector.
+//! Full TUI layout rendering for the `lab` selector.
 
-use crate::{entries::Entry, tui::app::App, NO_COLORS};
+use crate::{
+    entries::{has_date_prefix, Entry},
+    fuzzy::MatchResult,
+    tui::app::App,
+    NO_COLORS,
+};
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
     Frame,
 };
 use std::{sync::atomic::Ordering, time::SystemTime};
 
+const TITLE: &str = " Try Directory Selection";
+const FOOTER_HINTS: &str =
+    "↑/↓: Navigate  Enter: Select  ^R: Rename  ^G: Graduate  ^D: Delete  Esc: Cancel";
+
 /// Render a single frame for the current app state.
 pub fn render(frame: &mut Frame<'_>, app: &App) {
-    let areas = Layout::vertical([
-        Constraint::Length(3),
-        Constraint::Min(3),
-        Constraint::Length(2),
-    ])
-    .split(frame.area());
-
-    render_header(frame, areas[0], app);
-    render_body(frame, areas[1], app);
-    render_footer(frame, areas[2]);
-}
-
-fn render_header(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    let muted = muted_style();
-    let lines = vec![
-        Line::from(format!("🏠 {}", app.labs_path.display())),
-        Line::from(Span::styled(separator(area.width), muted)),
-        Line::from(vec![
-            Span::styled("Search: ", muted),
-            Span::raw(app.input.as_str()),
-        ]),
-    ];
+    let area = frame.area();
+    let colors_enabled = !NO_COLORS.load(Ordering::Relaxed);
+    let lines = build_lines(app, area.width, area.height)
+        .into_iter()
+        .map(|line| line.into_ratatui_line(colors_enabled))
+        .collect::<Vec<_>>();
 
     frame.render_widget(Paragraph::new(lines), area);
 }
 
-fn render_body(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    let visible_rows = usize::from(area.height);
-    let mut lines = Vec::new();
+/// Render a stable newline-delimited snapshot for test mode.
+pub fn render_snapshot(app: &App) -> String {
+    let colors_enabled = !NO_COLORS.load(Ordering::Relaxed);
+    render_snapshot_with_colors(
+        app,
+        app.terminal_size.width,
+        app.terminal_size.height,
+        colors_enabled,
+    )
+}
 
-    let end = (app.scroll_offset + visible_rows).min(app.total_items());
-    for list_index in app.scroll_offset..end {
-        if list_index < app.filtered.len() {
-            let result = &app.filtered[list_index];
-            let entry = &app.entries[result.index];
-            lines.push(render_entry_line(
-                entry,
-                result.score,
-                list_index == app.cursor_pos,
-                area,
-            ));
-        } else if app.show_create_new() {
-            let new_name = app.create_new_name().unwrap_or_default();
-            lines.push(render_virtual_line(
-                list_index == app.cursor_pos,
-                "📂",
-                format!("[new] {new_name}"),
-            ));
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum Foreground {
+    #[default]
+    Default,
+    Accent,
+    Highlight,
+    Muted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum Background {
+    #[default]
+    None,
+    Selected,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct SegmentStyleSpec {
+    fg: Foreground,
+    bg: Background,
+    bold: bool,
+    reversed: bool,
+}
+
+impl SegmentStyleSpec {
+    const fn normal() -> Self {
+        Self {
+            fg: Foreground::Default,
+            bg: Background::None,
+            bold: false,
+            reversed: false,
         }
     }
 
-    frame.render_widget(Paragraph::new(lines), area);
+    const fn accent() -> Self {
+        Self {
+            fg: Foreground::Accent,
+            bg: Background::None,
+            bold: true,
+            reversed: false,
+        }
+    }
+
+    const fn highlight() -> Self {
+        Self {
+            fg: Foreground::Highlight,
+            bg: Background::None,
+            bold: true,
+            reversed: false,
+        }
+    }
+
+    const fn muted() -> Self {
+        Self {
+            fg: Foreground::Muted,
+            bg: Background::None,
+            bold: false,
+            reversed: false,
+        }
+    }
+
+    const fn cursor() -> Self {
+        Self {
+            fg: Foreground::Default,
+            bg: Background::None,
+            bold: false,
+            reversed: true,
+        }
+    }
+
+    const fn with_background(self, bg: Background) -> Self {
+        Self { bg, ..self }
+    }
+
+    fn is_plain(self) -> bool {
+        self == Self::normal()
+    }
+
+    fn to_ratatui(self, colors_enabled: bool) -> Style {
+        if !colors_enabled {
+            return Style::default();
+        }
+
+        let mut style = Style::default();
+        if self.bold {
+            style = style.add_modifier(Modifier::BOLD);
+        }
+        if self.reversed {
+            style = style.add_modifier(Modifier::REVERSED);
+        }
+
+        style = match self.fg {
+            Foreground::Default => style,
+            Foreground::Accent => style.fg(Color::Indexed(214)),
+            Foreground::Highlight => style.fg(Color::Yellow),
+            Foreground::Muted => style.fg(Color::Indexed(245)),
+        };
+
+        match self.bg {
+            Background::None => style,
+            Background::Selected => style.bg(Color::Indexed(238)),
+        }
+    }
+
+    fn ansi_prefix(self, colors_enabled: bool) -> String {
+        if !colors_enabled || self.is_plain() {
+            return String::new();
+        }
+
+        let mut codes = Vec::new();
+        if self.bold {
+            codes.push("1");
+        }
+        if self.reversed {
+            codes.push("7");
+        }
+
+        match self.fg {
+            Foreground::Default => {}
+            Foreground::Accent => codes.push("38;5;214"),
+            Foreground::Highlight => codes.push("33"),
+            Foreground::Muted => codes.push("38;5;245"),
+        }
+
+        match self.bg {
+            Background::None => {}
+            Background::Selected => codes.push("48;5;238"),
+        }
+
+        format!("\x1b[{}m", codes.join(";"))
+    }
 }
 
-fn render_footer(frame: &mut Frame<'_>, area: Rect) {
-    let muted = muted_style();
-    let lines = vec![
-        Line::from(Span::styled(separator(area.width), muted)),
-        Line::from(Span::styled(
-            "Navigate: ↑/↓  Select: Enter  ^R: Rename  ^G: Graduate  ^D: Delete  Esc: Cancel",
-            muted,
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct StyledSegment {
+    text: String,
+    style: SegmentStyleSpec,
+}
+
+impl StyledSegment {
+    fn new(text: impl Into<String>, style: SegmentStyleSpec) -> Self {
+        Self {
+            text: text.into(),
+            style,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct StyledLine {
+    segments: Vec<StyledSegment>,
+}
+
+impl StyledLine {
+    fn into_ratatui_line(self, colors_enabled: bool) -> Line<'static> {
+        let spans = self
+            .segments
+            .into_iter()
+            .map(|segment| Span::styled(segment.text, segment.style.to_ratatui(colors_enabled)))
+            .collect::<Vec<_>>();
+
+        Line::from(spans)
+    }
+
+    fn to_ansi_string(&self, colors_enabled: bool) -> String {
+        let mut rendered = String::new();
+
+        for segment in &self.segments {
+            let prefix = segment.style.ansi_prefix(colors_enabled);
+            if prefix.is_empty() {
+                rendered.push_str(&segment.text);
+            } else {
+                rendered.push_str(&prefix);
+                rendered.push_str(&segment.text);
+                rendered.push_str("\x1b[0m");
+            }
+        }
+
+        rendered
+    }
+}
+
+fn render_snapshot_with_colors(app: &App, width: u16, height: u16, colors_enabled: bool) -> String {
+    let rendered = build_lines(app, width, height)
+        .into_iter()
+        .map(|line| line.to_ansi_string(colors_enabled))
+        .collect::<Vec<_>>();
+
+    if rendered.is_empty() {
+        String::new()
+    } else {
+        format!("\x1b[H{}\n", rendered.join("\n"))
+    }
+}
+
+fn build_lines(app: &App, width: u16, height: u16) -> Vec<StyledLine> {
+    let body_rows = body_height(height);
+    let mut lines = Vec::with_capacity(body_rows + 5);
+
+    lines.push(build_title_line(app, width));
+    lines.push(separator_line(width));
+    lines.push(build_search_line(app, width));
+    lines.extend(build_body_lines(app, width, body_rows));
+    lines.push(separator_line(width));
+    lines.push(centered_line(
+        width,
+        FOOTER_HINTS,
+        SegmentStyleSpec::muted(),
+    ));
+
+    lines
+}
+
+fn build_title_line(app: &App, width: u16) -> StyledLine {
+    compose_left_right(
+        width,
+        vec![
+            StyledSegment::new("🏠", SegmentStyleSpec::normal()),
+            StyledSegment::new(TITLE, SegmentStyleSpec::accent()),
+        ],
+        Some(StyledSegment::new(
+            app.labs_path.display().to_string(),
+            SegmentStyleSpec::muted(),
         )),
+        Background::None,
+    )
+}
+
+fn build_search_line(app: &App, width: u16) -> StyledLine {
+    let mut segments = vec![StyledSegment::new("Search: ", SegmentStyleSpec::muted())];
+    segments.extend(input_segments(&app.input, app.input_cursor_pos));
+
+    fill_line(width, segments, Background::None)
+}
+
+fn build_body_lines(app: &App, width: u16, body_rows: usize) -> Vec<StyledLine> {
+    let mut lines = Vec::with_capacity(body_rows);
+
+    for row in 0..body_rows {
+        let list_index = app.scroll_offset + row;
+        let line = if list_index < app.filtered.len() {
+            let result = &app.filtered[list_index];
+            let entry = &app.entries[result.index];
+            build_entry_line(entry, result, list_index == app.cursor_pos, width)
+        } else if app.show_create_new() && list_index == app.filtered.len() {
+            build_create_line(app, list_index == app.cursor_pos, width)
+        } else {
+            blank_line(width, Background::None)
+        };
+
+        lines.push(line);
+    }
+
+    lines
+}
+
+fn build_entry_line(entry: &Entry, result: &MatchResult, selected: bool, width: u16) -> StyledLine {
+    let background = if selected {
+        Background::Selected
+    } else {
+        Background::None
+    };
+
+    let line_fill = fill_style(background);
+    let prefix_style = if selected {
+        SegmentStyleSpec::highlight().with_background(background)
+    } else {
+        line_fill
+    };
+
+    let mut left = vec![
+        StyledSegment::new(if selected { "→ " } else { "  " }, prefix_style),
+        StyledSegment::new(if entry.is_symlink { "🔗" } else { "📁" }, line_fill),
+        StyledSegment::new(" ", line_fill),
     ];
 
-    frame.render_widget(Paragraph::new(lines), area);
-}
+    let name_segments = format_entry_name(&entry.name, &result.positions, background);
+    let max_name_width = usize::from(width).saturating_sub(prefix_width() + 1);
+    let name_width = text_width(&entry.name);
 
-fn render_entry_line(entry: &Entry, score: f64, selected: bool, area: Rect) -> Line<'static> {
-    let indicator = if selected { "→" } else { " " };
-    let icon = if entry.is_symlink { "🔗" } else { "📁" };
-    let metadata = format!("{}, {:.1}", format_relative_time(entry.mtime), score);
-    let prefix_width = 6;
-    let suffix_width = metadata.chars().count() + 2;
-    let available = usize::from(area.width).saturating_sub(prefix_width + suffix_width);
-    let display_name = truncate_name(&entry.name, available);
+    let display_name = if name_width > max_name_width {
+        truncated_name_segments(&name_segments, max_name_width, background)
+    } else {
+        name_segments
+    };
 
-    if NO_COLORS.load(Ordering::Relaxed) {
-        return Line::from(format!("{indicator} {icon} {display_name}  {metadata}"));
+    left.extend(display_name);
+
+    if name_width > max_name_width {
+        return fill_line(width, left, background);
     }
 
-    let selected_style = selected_style(selected);
-    Line::from(vec![
-        Span::styled(indicator.to_string(), selected_style),
-        Span::raw(" "),
-        Span::styled(icon.to_string(), selected_style),
-        Span::raw(" "),
-        Span::styled(display_name, selected_style),
-        Span::raw("  "),
-        Span::styled(metadata, muted_style()),
-    ])
+    let metadata = StyledSegment::new(
+        format!("{}, {:.1}", format_relative_time(entry.mtime), result.score),
+        SegmentStyleSpec::muted().with_background(background),
+    );
+
+    compose_left_right(width, left, Some(metadata), background)
 }
 
-fn render_virtual_line(selected: bool, icon: &str, text: String) -> Line<'static> {
-    if NO_COLORS.load(Ordering::Relaxed) {
-        return Line::from(format!(
-            "{} {} {}",
-            if selected { "→" } else { " " },
-            icon,
-            text
+fn build_create_line(app: &App, selected: bool, width: u16) -> StyledLine {
+    let background = if selected {
+        Background::Selected
+    } else {
+        Background::None
+    };
+
+    let line_fill = fill_style(background);
+    let prefix_style = if selected {
+        SegmentStyleSpec::highlight().with_background(background)
+    } else {
+        line_fill
+    };
+    let label = match app.create_new_name() {
+        Some(name) => format!("Create new: {name}"),
+        None => "Create new".to_string(),
+    };
+
+    fill_line(
+        width,
+        vec![
+            StyledSegment::new(if selected { "→ " } else { "  " }, prefix_style),
+            StyledSegment::new("📂", line_fill),
+            StyledSegment::new(" ", line_fill),
+            StyledSegment::new(label, line_fill),
+        ],
+        background,
+    )
+}
+
+fn separator_line(width: u16) -> StyledLine {
+    StyledLine {
+        segments: vec![StyledSegment::new(
+            "─".repeat(usize::from(width)),
+            SegmentStyleSpec::muted(),
+        )],
+    }
+}
+
+fn centered_line(width: u16, text: &str, style: SegmentStyleSpec) -> StyledLine {
+    let width = usize::from(width);
+    let content = truncate_segments(&[StyledSegment::new(text, style)], width);
+    let content_width = segments_width(&content);
+    let left_padding = width.saturating_sub(content_width) / 2;
+    let right_padding = width.saturating_sub(content_width + left_padding);
+
+    let mut segments = Vec::new();
+    append_spaces(&mut segments, left_padding, fill_style(Background::None));
+    extend_segments(&mut segments, content);
+    append_spaces(&mut segments, right_padding, fill_style(Background::None));
+
+    StyledLine { segments }
+}
+
+fn fill_line(width: u16, left: Vec<StyledSegment>, background: Background) -> StyledLine {
+    compose_left_right(width, left, None, background)
+}
+
+fn compose_left_right(
+    width: u16,
+    left: Vec<StyledSegment>,
+    right: Option<StyledSegment>,
+    background: Background,
+) -> StyledLine {
+    let width = usize::from(width);
+    let mut segments = truncate_segments(&left, width);
+    let left_width = segments_width(&segments);
+
+    if let Some(right) = right {
+        let available_for_right = width.saturating_sub(left_width + 1);
+        if available_for_right > 0 {
+            let truncated_right = truncate_text_from_start(&right.text, available_for_right);
+            let right_width = text_width(&truncated_right);
+            let gap_width = width.saturating_sub(left_width + right_width);
+            append_spaces(&mut segments, gap_width, fill_style(background));
+            append_segment(
+                &mut segments,
+                truncated_right,
+                right.style.with_background(background),
+            );
+            return StyledLine { segments };
+        }
+    }
+
+    append_spaces(
+        &mut segments,
+        width.saturating_sub(left_width),
+        fill_style(background),
+    );
+    StyledLine { segments }
+}
+
+fn blank_line(width: u16, background: Background) -> StyledLine {
+    StyledLine {
+        segments: vec![StyledSegment::new(
+            " ".repeat(usize::from(width)),
+            fill_style(background),
+        )],
+    }
+}
+
+fn format_entry_name(
+    name: &str,
+    positions: &[usize],
+    background: Background,
+) -> Vec<StyledSegment> {
+    if has_date_prefix(name) && name.len() > 11 {
+        let date_part = &name[..11];
+        let name_part = &name[11..];
+        let mut segments = vec![StyledSegment::new(
+            date_part.to_string(),
+            SegmentStyleSpec::muted().with_background(background),
+        )];
+        segments.extend(highlighted_name_segments(
+            name_part, positions, 11, background,
         ));
+        segments
+    } else {
+        highlighted_name_segments(name, positions, 0, background)
+    }
+}
+
+fn highlighted_name_segments(
+    text: &str,
+    positions: &[usize],
+    offset: usize,
+    background: Background,
+) -> Vec<StyledSegment> {
+    if text.is_empty() {
+        return Vec::new();
     }
 
-    let style = selected_style(selected);
-    Line::from(vec![
-        Span::styled(if selected { "→" } else { " " }, style),
-        Span::raw(" "),
-        Span::styled(icon.to_string(), style),
-        Span::raw(" "),
-        Span::styled(text, style),
-    ])
+    let base = SegmentStyleSpec::normal().with_background(background);
+    let highlight = SegmentStyleSpec::highlight().with_background(background);
+    let mut segments = Vec::new();
+    let mut current = String::new();
+    let mut current_style = base;
+    let mut initialized = false;
+    let mut position_index = 0;
+
+    for (index, ch) in text.chars().enumerate() {
+        while position_index < positions.len() && positions[position_index] < index + offset {
+            position_index += 1;
+        }
+
+        let style = if positions.get(position_index) == Some(&(index + offset)) {
+            position_index += 1;
+            highlight
+        } else {
+            base
+        };
+
+        if !initialized {
+            current_style = style;
+            initialized = true;
+        }
+
+        if style != current_style {
+            append_segment(&mut segments, std::mem::take(&mut current), current_style);
+            current_style = style;
+        }
+
+        current.push(ch);
+    }
+
+    append_segment(&mut segments, current, current_style);
+    segments
 }
 
-fn separator(width: u16) -> String {
-    "─".repeat(usize::from(width))
+fn input_segments(input: &str, cursor_pos: usize) -> Vec<StyledSegment> {
+    let chars = input.chars().collect::<Vec<_>>();
+    let cursor_pos = cursor_pos.min(chars.len());
+
+    if chars.is_empty() {
+        return vec![StyledSegment::new(" ", SegmentStyleSpec::cursor())];
+    }
+
+    let mut segments = Vec::new();
+
+    if cursor_pos > 0 {
+        append_segment(
+            &mut segments,
+            chars[..cursor_pos].iter().collect::<String>(),
+            SegmentStyleSpec::normal(),
+        );
+    }
+
+    let cursor_char = chars.get(cursor_pos).copied().unwrap_or(' ');
+    append_segment(
+        &mut segments,
+        cursor_char.to_string(),
+        SegmentStyleSpec::cursor(),
+    );
+
+    if cursor_pos < chars.len() {
+        append_segment(
+            &mut segments,
+            chars[cursor_pos + 1..].iter().collect::<String>(),
+            SegmentStyleSpec::normal(),
+        );
+    }
+
+    segments
 }
 
-fn truncate_name(name: &str, max_width: usize) -> String {
-    let char_count = name.chars().count();
+fn truncated_name_segments(
+    segments: &[StyledSegment],
+    max_width: usize,
+    background: Background,
+) -> Vec<StyledSegment> {
+    match max_width {
+        0 => Vec::new(),
+        1 => vec![StyledSegment::new(
+            "…",
+            SegmentStyleSpec::normal().with_background(background),
+        )],
+        _ => {
+            let mut truncated = truncate_segments(segments, max_width - 1);
+            append_segment(
+                &mut truncated,
+                "…",
+                SegmentStyleSpec::normal().with_background(background),
+            );
+            truncated
+        }
+    }
+}
+
+fn truncate_segments(segments: &[StyledSegment], max_width: usize) -> Vec<StyledSegment> {
     if max_width == 0 {
-        return String::new();
-    }
-    if char_count <= max_width {
-        return name.to_string();
-    }
-    if max_width == 1 {
-        return "…".to_string();
+        return Vec::new();
     }
 
-    let truncated: String = name.chars().take(max_width - 1).collect();
-    format!("{truncated}…")
+    let mut remaining = max_width;
+    let mut truncated = Vec::new();
+
+    for segment in segments {
+        if remaining == 0 {
+            break;
+        }
+
+        let text = take_prefix_by_width(&segment.text, remaining);
+        let width = text_width(&text);
+        append_segment(&mut truncated, text, segment.style);
+        remaining = remaining.saturating_sub(width);
+    }
+
+    truncated
+}
+
+fn truncate_text_from_start(text: &str, max_width: usize) -> String {
+    if text_width(text) <= max_width {
+        return text.to_string();
+    }
+
+    take_suffix_by_width(text, max_width)
+}
+
+fn append_spaces(segments: &mut Vec<StyledSegment>, count: usize, style: SegmentStyleSpec) {
+    if count > 0 {
+        append_segment(segments, " ".repeat(count), style);
+    }
+}
+
+fn extend_segments(target: &mut Vec<StyledSegment>, segments: Vec<StyledSegment>) {
+    for segment in segments {
+        append_segment(target, segment.text, segment.style);
+    }
+}
+
+fn append_segment(
+    segments: &mut Vec<StyledSegment>,
+    text: impl Into<String>,
+    style: SegmentStyleSpec,
+) {
+    let text = text.into();
+    if text.is_empty() {
+        return;
+    }
+
+    if let Some(last) = segments.last_mut() {
+        if last.style == style {
+            last.text.push_str(&text);
+            return;
+        }
+    }
+
+    segments.push(StyledSegment::new(text, style));
+}
+
+fn prefix_width() -> usize {
+    text_width("→ 📁 ")
+}
+
+fn segments_width(segments: &[StyledSegment]) -> usize {
+    segments
+        .iter()
+        .map(|segment| text_width(&segment.text))
+        .sum()
+}
+
+fn text_width(text: &str) -> usize {
+    text.chars().map(char_width).sum()
+}
+
+fn take_prefix_by_width(text: &str, max_width: usize) -> String {
+    let mut width = 0;
+    let mut truncated = String::new();
+
+    for ch in text.chars() {
+        let char_width = char_width(ch);
+        if width + char_width > max_width {
+            break;
+        }
+        truncated.push(ch);
+        width += char_width;
+    }
+
+    truncated
+}
+
+fn take_suffix_by_width(text: &str, max_width: usize) -> String {
+    let chars = text.chars().collect::<Vec<_>>();
+    let mut width = 0;
+    let mut start = chars.len();
+
+    while start > 0 {
+        let next_width = char_width(chars[start - 1]);
+        if width + next_width > max_width {
+            break;
+        }
+
+        width += next_width;
+        start -= 1;
+    }
+
+    chars[start..].iter().collect()
+}
+
+fn char_width(ch: char) -> usize {
+    let code = ch as u32;
+    if matches!(
+        code,
+        0x0300..=0x036F
+            | 0x200B..=0x200D
+            | 0xFE00..=0xFE0F
+            | 0xE0100..=0xE01EF
+    ) {
+        0
+    } else if matches!(
+        code,
+        0x1100..=0x115F
+            | 0x2329..=0x232A
+            | 0x2E80..=0xA4CF
+            | 0xAC00..=0xD7A3
+            | 0xF900..=0xFAFF
+            | 0xFE10..=0xFE19
+            | 0xFE30..=0xFE6F
+            | 0xFF00..=0xFF60
+            | 0xFFE0..=0xFFE6
+            | 0x1F300..=0x1FAFF
+    ) {
+        2
+    } else {
+        1
+    }
+}
+
+fn fill_style(background: Background) -> SegmentStyleSpec {
+    SegmentStyleSpec::normal().with_background(background)
+}
+
+fn body_height(height: u16) -> usize {
+    usize::from(height.saturating_sub(5)).max(3)
 }
 
 fn format_relative_time(mtime: SystemTime) -> String {
@@ -161,18 +734,189 @@ fn format_relative_time(mtime: SystemTime) -> String {
     }
 }
 
-fn muted_style() -> Style {
-    if NO_COLORS.load(Ordering::Relaxed) {
-        Style::default()
-    } else {
-        Style::default().add_modifier(Modifier::DIM)
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tui::app::TerminalSize;
+    use std::{
+        path::PathBuf,
+        time::{Duration, SystemTime},
+    };
 
-fn selected_style(selected: bool) -> Style {
-    if NO_COLORS.load(Ordering::Relaxed) || !selected {
-        Style::default()
-    } else {
-        Style::default().add_modifier(Modifier::BOLD)
+    fn make_entry(name: &str, is_symlink: bool, mtime: SystemTime) -> Entry {
+        Entry {
+            name: name.to_string(),
+            path: PathBuf::from(format!("/tmp/{name}")),
+            is_symlink,
+            mtime,
+            base_score: 0.0,
+        }
+    }
+
+    fn make_app(entries: Vec<Entry>, width: u16, height: u16, input: Option<&str>) -> App {
+        App::new(
+            "/tmp/labs",
+            entries,
+            input,
+            TerminalSize::new(width, height),
+        )
+    }
+
+    fn snapshot(app: &App, colors_enabled: bool) -> String {
+        render_snapshot_with_colors(
+            app,
+            app.terminal_size.width,
+            app.terminal_size.height,
+            colors_enabled,
+        )
+    }
+
+    #[test]
+    fn test_render_snapshot_includes_full_layout() {
+        let mut app = make_app(
+            vec![make_entry("2025-11-29-project", false, SystemTime::now())],
+            60,
+            8,
+            None,
+        );
+        app.filtered = vec![MatchResult {
+            index: 0,
+            score: 5.0,
+            positions: Vec::new(),
+        }];
+
+        let rendered = snapshot(&app, false);
+        let lines = rendered.lines().collect::<Vec<_>>();
+
+        assert_eq!(lines.len(), 8);
+        assert!(lines[0].contains("🏠"));
+        assert!(lines[0].contains("Try Directory Selection"));
+        assert!(lines[0].ends_with("/tmp/labs"));
+        assert_eq!(lines[1], "─".repeat(60));
+        assert!(lines[2].starts_with("Search: "));
+        assert!(lines[3].starts_with("→ 📁 "));
+        assert_eq!(lines[6], "─".repeat(60));
+        assert!(lines[7].contains("Enter: Select"));
+    }
+
+    #[test]
+    fn test_render_snapshot_shows_reverse_video_cursor() {
+        let app = make_app(Vec::new(), 40, 8, Some("lab"));
+        let rendered = snapshot(&app, true);
+
+        assert!(rendered.contains("lab\x1b[7m \x1b[0m"));
+    }
+
+    #[test]
+    fn test_selected_line_uses_background_and_dimmed_date_prefix() {
+        let mut app = make_app(
+            vec![make_entry("2025-11-29-project", false, SystemTime::now())],
+            80,
+            8,
+            None,
+        );
+        app.filtered = vec![MatchResult {
+            index: 0,
+            score: 4.2,
+            positions: Vec::new(),
+        }];
+
+        let rendered = snapshot(&app, true);
+        let selected_line = rendered.lines().nth(3).expect("selected line");
+
+        assert!(selected_line.contains("\x1b[48;5;238m"));
+        assert!(selected_line.contains("2025-11-29-"));
+        assert!(selected_line.contains("38;5;245"));
+        assert!(selected_line.contains("just now, 4.2"));
+    }
+
+    #[test]
+    fn test_symlink_entries_render_link_icon() {
+        let mut app = make_app(
+            vec![make_entry("linked-project", true, SystemTime::now())],
+            60,
+            8,
+            None,
+        );
+        app.filtered = vec![MatchResult {
+            index: 0,
+            score: 3.0,
+            positions: Vec::new(),
+        }];
+
+        let rendered = snapshot(&app, false);
+        assert!(rendered.lines().nth(3).unwrap_or_default().contains("🔗"));
+    }
+
+    #[test]
+    fn test_metadata_truncates_from_left_when_space_is_limited() {
+        let name = "2025-11-29-medium-length-project";
+        let width = (prefix_width() + text_width(name) + 4) as u16;
+        let mut app = make_app(
+            vec![make_entry(name, false, SystemTime::now())],
+            width,
+            8,
+            None,
+        );
+        app.filtered = vec![MatchResult {
+            index: 0,
+            score: 3.0,
+            positions: Vec::new(),
+        }];
+
+        let rendered = snapshot(&app, false);
+        let line = rendered.lines().nth(3).expect("entry line");
+
+        assert!(line.contains(name));
+        assert!(line.ends_with("3.0"));
+        assert!(!line.contains("just now, 3.0"));
+    }
+
+    #[test]
+    fn test_truncated_names_hide_metadata() {
+        let name = "2025-11-29-extremely-long-project-name-that-needs-truncation";
+        let mut app = make_app(
+            vec![make_entry(name, false, SystemTime::now())],
+            24,
+            8,
+            None,
+        );
+        app.filtered = vec![MatchResult {
+            index: 0,
+            score: 3.0,
+            positions: Vec::new(),
+        }];
+
+        let rendered = snapshot(&app, false);
+        let line = rendered.lines().nth(3).expect("entry line");
+
+        assert!(line.contains("…"));
+        assert!(!line.contains("3.0"));
+    }
+
+    #[test]
+    fn test_format_relative_time_thresholds() {
+        let now = SystemTime::now();
+
+        assert_eq!(
+            format_relative_time(now - Duration::from_secs(59)),
+            "just now"
+        );
+        assert_eq!(
+            format_relative_time(now - Duration::from_secs(60)),
+            "1m ago"
+        );
+        assert_eq!(
+            format_relative_time(now - Duration::from_secs(3_600)),
+            "1h ago"
+        );
+        assert_eq!(
+            format_relative_time(now - Duration::from_secs(86_400)),
+            "1d ago"
+        );
+        assert_eq!(
+            format_relative_time(now - Duration::from_secs(604_800)),
+            "1w ago"
+        );
     }
 }

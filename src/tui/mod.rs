@@ -60,27 +60,26 @@ pub fn run_tui(app: &mut App, options: RunOptions<'_>) -> io::Result<TuiOutcome>
         });
     }
 
-    let mut session = TerminalSession::enter(app.terminal_size, interactive)?;
-
-    if options.and_exit && options.and_keys.is_none() {
-        draw_app(&mut session.terminal, app)?;
-        return Ok(TuiOutcome::Cancelled {
-            emit_message: false,
-        });
-    }
-
     if options.use_test_source {
+        if options.and_exit {
+            if options.and_keys.is_some() {
+                let mut key_source = TestKeySource::new(options.and_keys);
+                let _ = drive_test_mode(app, &mut key_source);
+            }
+            io::stderr().write_all(render::render_snapshot(app).as_bytes())?;
+            return Ok(TuiOutcome::Cancelled {
+                emit_message: false,
+            });
+        }
+
         let mut key_source = TestKeySource::new(options.and_keys);
         let outcome = drive_test_mode(app, &mut key_source);
-        if options.and_exit {
-            draw_app(&mut session.terminal, app)?;
-        }
         return Ok(outcome);
     }
 
+    let mut session = TerminalSession::enter(app.terminal_size, interactive)?;
     interactive_loop(&mut session.terminal, app)
 }
-
 struct TerminalSession {
     terminal: TuiTerminal,
     raw_mode_enabled: bool,

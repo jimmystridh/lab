@@ -124,7 +124,7 @@ impl App {
 
     /// Maximum number of real entries shown at once.
     pub fn visible_result_limit(&self) -> usize {
-        usize::from(self.terminal_size.height.saturating_sub(6)).max(3)
+        usize::from(self.terminal_size.height.saturating_sub(5)).max(3)
     }
 
     /// Whether the virtual "create new" row should be shown.
@@ -410,6 +410,27 @@ mod tests {
         assert_eq!(app.cursor_pos, app.visible_result_limit());
         app.page_up();
         assert_eq!(app.cursor_pos, 0);
+    }
+
+    #[test]
+    fn test_visible_result_limit_matches_header_body_footer_layout() {
+        let app = App::new(
+            "/tmp/labs",
+            vec![make_entry("alpha", 1.0)],
+            None,
+            TerminalSize::new(80, 10),
+        );
+
+        assert_eq!(app.visible_result_limit(), 5);
+
+        let tiny = App::new(
+            "/tmp/labs",
+            vec![make_entry("alpha", 1.0)],
+            None,
+            TerminalSize::new(80, 6),
+        );
+
+        assert_eq!(tiny.visible_result_limit(), 3);
     }
 
     #[test]
