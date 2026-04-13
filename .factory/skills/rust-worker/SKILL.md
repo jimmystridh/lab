@@ -45,6 +45,8 @@ Understand the EXACT behavior before implementing. The Ruby code is the ground t
 - Edge cases (empty input, boundary values, special characters)
 - Error paths
 
+For features spanning multiple modules with new shared enums/structs, it is acceptable to scaffold the minimal shared type definitions first so the focused tests can compile. After that scaffold exists, continue with normal red/green work on the behavior under test.
+
 Run `cargo test` to confirm tests fail (red).
 
 ### 4. Implement
