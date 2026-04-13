@@ -1,0 +1,201 @@
+{
+  "groupId": "delete-mode",
+  "testedAt": "2026-04-13T13:50:00Z",
+  "isolation": {
+    "binaryPath": "/Users/js/code/rust/lab/target/debug/lab",
+    "testDir": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/tmp.n6MrkadCxs",
+    "envOverrides": "LAB_WIDTH=80 LAB_HEIGHT=24"
+  },
+  "toolsUsed": ["shell commands (Execute tool)", "cargo test"],
+  "assertions": [
+    {
+      "id": "VAL-ACT-001",
+      "title": "Ctrl-D toggles mark for deletion",
+      "status": "pass",
+      "steps": [
+        { "action": "Run with --and-keys='CTRL-D,ENTER,TYPE=YES,ENTER'", "expected": "Delete script emitted (mark worked)", "observed": "Delete script emitted for gamma, exit 0" },
+        { "action": "Run with --and-keys='CTRL-D,CTRL-D,ENTER'", "expected": "CD script emitted (unmark restored normal mode)", "observed": "CD (touch+echo+cd) script emitted for gamma, exit 0" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-actions/delete-mode/VAL-ACT-001-mark-confirm.stdout.txt", "tui-actions/delete-mode/VAL-ACT-001-unmark-select.stdout.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-002",
+      "title": "Multiple entries can be marked",
+      "status": "pass",
+      "steps": [
+        { "action": "Run with --and-keys='CTRL-D,DOWN,CTRL-D,ENTER,TYPE=YES,ENTER'", "expected": "Delete script targets both gamma and beta", "observed": "Script contains rm -rf for both '2025-03-25-gamma' and '2025-02-20-beta', exit 0" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-actions/delete-mode/VAL-ACT-002-multiple-marks.stdout.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-003",
+      "title": "Delete mode footer changes",
+      "status": "pass",
+      "steps": [
+        { "action": "Run cargo test test_delete_mode_footer", "expected": "Unit test passes confirming DELETE MODE footer rendering", "observed": "test tui::render::tests::test_delete_mode_footer_uses_danger_background_and_mark_count ... ok" },
+        { "action": "Verify render.rs line 383-386 contains DELETE MODE footer logic", "expected": "Footer text includes 'DELETE MODE | N marked | Ctrl-D: Toggle | Enter: Confirm | Esc: Cancel'", "observed": "Confirmed in source code at render.rs:383-386" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "N/A",
+        "unitTestOutput": "cargo test test_delete_mode_footer: 1 passed, 0 failed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-004",
+      "title": "Marked entries show danger background",
+      "status": "pass",
+      "steps": [
+        { "action": "Run cargo test test_marked_entry", "expected": "Unit test passes confirming trash icon and danger background", "observed": "test tui::render::tests::test_marked_entry_uses_trash_icon_and_danger_background ... ok" },
+        { "action": "Verify render.rs line 340-346 uses Background::Danger for marked entries and 🗑️ icon", "expected": "Marked entries get danger background and trash icon", "observed": "Confirmed: marked=true → Background::Danger, icon='🗑️'" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "network": "N/A",
+        "unitTestOutput": "cargo test test_marked_entry: 1 passed, 0 failed"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-005",
+      "title": "YES confirmation required for delete",
+      "status": "pass",
+      "steps": [
+        { "action": "Run with --and-keys='CTRL-D,ENTER,TYPE=YES,ENTER'", "expected": "YES produces rm script", "observed": "Delete script emitted, exit 0, contains rm -rf" },
+        { "action": "Run with --and-keys='CTRL-D,ENTER,TYPE=no,ENTER'", "expected": "'no' does not produce rm script", "observed": "Empty stdout, exit 1, no rm -rf" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-actions/delete-mode/VAL-ACT-005-yes-confirm.stdout.txt", "tui-actions/delete-mode/VAL-ACT-005-no-cancel.stdout.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-006",
+      "title": "Delete script format correct",
+      "status": "pass",
+      "steps": [
+        { "action": "Capture stdout from --and-keys='CTRL-D,ENTER,TYPE=YES,ENTER'", "expected": "Script: cd 'base' && test -d 'name' && rm -rf 'name' && cd 'pwd' 2>/dev/null || cd 'base'", "observed": "Script format matches exactly: cd '/private/.../tmp.n6MrkadCxs' && \\n  test -d '2025-03-25-gamma' && rm -rf '2025-03-25-gamma' && \\n  cd '/Users/js/code/rust/lab' 2>/dev/null || cd '/private/.../tmp.n6MrkadCxs'" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-actions/delete-mode/VAL-ACT-006-script-format.stdout.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-007",
+      "title": "ESC/Ctrl-C cancels delete mode",
+      "status": "pass",
+      "steps": [
+        { "action": "Run with --and-keys='CTRL-D,ESC,ESC'", "expected": "Exit code 1, no rm in stdout", "observed": "Exit 1, empty stdout" },
+        { "action": "Run with --and-keys='CTRL-D,CTRL-C,CTRL-C'", "expected": "Exit code 1, no rm in stdout", "observed": "Exit 1, empty stdout" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-actions/delete-mode/VAL-ACT-007-esc-cancel.stdout.txt", "tui-actions/delete-mode/VAL-ACT-007-ctrlc-cancel.stdout.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-008",
+      "title": "Delete script uses basenames with safety check",
+      "status": "pass",
+      "steps": [
+        { "action": "Inspect delete script from VAL-ACT-006", "expected": "rm uses basenames only, not absolute paths", "observed": "Script uses 'test -d '2025-03-25-gamma' && rm -rf '2025-03-25-gamma'' — basename only, after cd to base" },
+        { "action": "Verify build_delete_selection in app.rs validates paths under base_path", "expected": "Safety check: target_real.starts_with(&base_path)", "observed": "Confirmed in app.rs: fs::canonicalize resolves symlinks, starts_with check prevents path traversal" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-actions/delete-mode/VAL-ACT-006-script-format.stdout.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-009",
+      "title": "Delete script restores PWD",
+      "status": "pass",
+      "steps": [
+        { "action": "Inspect last line of delete script", "expected": "cd 'original_pwd' 2>/dev/null || cd 'base'", "observed": "Last line: cd '/Users/js/code/rust/lab' 2>/dev/null || cd '/private/.../tmp.n6MrkadCxs'" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-actions/delete-mode/VAL-ACT-006-script-format.stdout.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-026",
+      "title": "Batch delete targets only marked entries",
+      "status": "pass",
+      "steps": [
+        { "action": "Mark entries 0 (gamma) and 2 (alpha), skip 1 (beta), confirm with YES", "expected": "rm for gamma and alpha only, not beta", "observed": "Script contains rm -rf for gamma and alpha, zero occurrences of beta" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-actions/delete-mode/VAL-ACT-026-batch-selective.stdout.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-027",
+      "title": "Delete confirmation is case-sensitive YES only",
+      "status": "pass",
+      "steps": [
+        { "action": "Confirm with 'yes' (lowercase)", "expected": "Cancels deletion", "observed": "Exit 1, empty stdout, no rm" },
+        { "action": "Confirm with 'Yes' (mixed case)", "expected": "Cancels deletion", "observed": "Exit 1, empty stdout, no rm" },
+        { "action": "Confirm with 'y'", "expected": "Cancels deletion", "observed": "Exit 1, empty stdout, no rm" },
+        { "action": "Confirm with 'YES' (uppercase)", "expected": "Produces rm script", "observed": "Exit 0, stdout contains rm -rf" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-actions/delete-mode/VAL-ACT-027-lowercase-yes.stdout.txt", "tui-actions/delete-mode/VAL-ACT-027-uppercase-YES.stdout.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-010",
+      "title": "Navigate + delete targets correct entry",
+      "status": "pass",
+      "steps": [
+        { "action": "Navigate down twice (to alpha, 3rd entry), Ctrl-D, confirm with YES", "expected": "Delete script targets alpha only", "observed": "Script contains rm -rf for '2025-01-15-alpha' only, no gamma or beta" }
+      ],
+      "evidence": {
+        "screenshots": ["tui-actions/delete-mode/VAL-CROSS-010-navigate-delete.stdout.txt"],
+        "consoleErrors": "none",
+        "network": "N/A"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "The --and-exit flag combined with --and-keys always renders the final app state AFTER drive_test_mode completes (including auto-ESC processing), which clears delete marks before the snapshot. This means intermediate marked states cannot be directly captured in stderr. Visual assertions (003, 004) verified via unit tests instead.",
+      "resolved": true,
+      "resolution": "Used cargo unit tests (test_delete_mode_footer_uses_danger_background_and_mark_count, test_marked_entry_uses_trash_icon_and_danger_background) to verify rendering, and functional tests via script output to verify behavior.",
+      "affectedAssertions": ["VAL-ACT-003", "VAL-ACT-004"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 12 assertions: all 12 passed. Delete mode toggle (mark/unmark), multiple marks, script format, YES-only confirmation, ESC/Ctrl-C cancel, basename safety, PWD restoration, batch targeting, case-sensitivity, and cross-area navigation+delete all verified through functional script output testing and unit tests."
+}

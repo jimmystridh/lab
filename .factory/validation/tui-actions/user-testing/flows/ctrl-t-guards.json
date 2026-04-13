@@ -1,0 +1,65 @@
+{
+  "groupId": "ctrl-t-guards",
+  "testedAt": "2026-04-13T13:40:00Z",
+  "isolation": {
+    "binaryPath": "/Users/js/code/rust/lab/target/debug/lab",
+    "tempDirectories": "mktemp -d per test (cleaned up after each)",
+    "envOverrides": "LAB_WIDTH=80 LAB_HEIGHT=24"
+  },
+  "toolsUsed": ["shell commands (Execute tool)"],
+  "assertions": [
+    {
+      "id": "VAL-ACT-024",
+      "title": "Ctrl-T creates new entry immediately",
+      "status": "pass",
+      "steps": [
+        { "action": "Create temp dir with one existing entry 2025-01-15-alpha", "expected": "Directory created", "observed": "Directory created" },
+        { "action": "Run lab exec --path $TEST_DIR --and-keys='TYPE=quicktest,CTRL-T'", "expected": "Exit 0 with mkdir script on stdout", "observed": "Exit 0" },
+        { "action": "Check stdout for mkdir -p", "expected": "stdout contains mkdir -p", "observed": "stdout contains: mkdir -p '/tmp/.../2026-04-13-quicktest'" },
+        { "action": "Check stdout for date prefix + typed text", "expected": "stdout contains 2026-04-13-quicktest", "observed": "stdout contains 2026-04-13-quicktest with touch, echo, and cd" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "stdoutCapture": "tui-actions/ctrl-t-guards/VAL-ACT-024-stdout.txt"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-025",
+      "title": "URL shorthand triggers clone from TUI",
+      "status": "pass",
+      "steps": [
+        { "action": "Run lab exec --path $TEST_DIR https://github.com/user/repo", "expected": "stdout contains git clone", "observed": "stdout contains: git clone 'https://github.com/user/repo'" },
+        { "action": "Run lab exec --path $TEST_DIR git@github.com:user/repo", "expected": "stdout contains git clone", "observed": "stdout contains: git clone 'git@github.com:user/repo'" },
+        { "action": "Verify both produce date-prefixed dir name user-repo", "expected": "path contains 2026-04-13-user-repo", "observed": "Both outputs contain 2026-04-13-user-repo" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "stdoutCapture": ["tui-actions/ctrl-t-guards/VAL-ACT-025-https-stdout.txt", "tui-actions/ctrl-t-guards/VAL-ACT-025-ssh-stdout.txt"]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-029",
+      "title": "Actions only apply to directory entries not create-new",
+      "status": "pass",
+      "steps": [
+        { "action": "Type 'xyznotfound' to filter to only create-new entry, then press CTRL-R, then ESC", "expected": "No rename dialog, clean exit 1, empty stdout", "observed": "Exit 1, empty stdout, no rename dialog in stderr" },
+        { "action": "Type 'xyznotfound' then CTRL-G then ESC", "expected": "No graduate dialog, clean exit 1, empty stdout", "observed": "Exit 1, empty stdout, no graduate dialog in stderr" },
+        { "action": "Type 'xyznotfound' then CTRL-D then ESC", "expected": "No delete marking, clean exit 1, empty stdout", "observed": "Exit 1, empty stdout, no delete marking in stderr" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "none",
+        "stderrCaptures": ["tui-actions/ctrl-t-guards/VAL-ACT-029-ctrlr-stderr.txt", "tui-actions/ctrl-t-guards/VAL-ACT-029-ctrlg-stderr.txt", "tui-actions/ctrl-t-guards/VAL-ACT-029-ctrld-stderr.txt"],
+        "combinedReport": "tui-actions/ctrl-t-guards/VAL-ACT-029-combined.txt"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 3 assertions: 3 passed. Ctrl-T correctly generates mkdir+cd scripts with date-prefixed names, URL shorthands (both HTTPS and SSH) correctly trigger git clone workflow, and Ctrl-R/G/D are correctly guarded against the create-new virtual entry."
+}

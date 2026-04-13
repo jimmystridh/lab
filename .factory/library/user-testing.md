@@ -105,3 +105,58 @@ touch "$TEST_DIR/regular-file.txt"
 **Cleanup:** Always `rm -rf "$TEST_DIR"` at end.
 
 **Evidence:** Save evidence to `/Users/js/.factory/missions/4e064f1d-55c5-4e80-9c43-b2e62ac80846/evidence/tui-core/<group-id>/`
+
+## Flow Validator Guidance: tui-actions-shell
+
+**Binary path:** `/Users/js/code/rust/lab/target/debug/lab`
+
+**Test fixture setup pattern:**
+Each flow validator group MUST create its own isolated test directory using `mktemp -d` and populate it with test entries. Example:
+```bash
+LAB_BIN="/Users/js/code/rust/lab/target/debug/lab"
+TEST_DIR=$(mktemp -d)
+mkdir -p "$TEST_DIR/2025-01-15-alpha"
+mkdir -p "$TEST_DIR/2025-02-20-beta"
+mkdir -p "$TEST_DIR/2025-03-25-gamma"
+mkdir -p "$TEST_DIR/nodateprefix"
+touch "$TEST_DIR/2025-01-15-alpha"
+touch "$TEST_DIR/2025-02-20-beta"
+touch "$TEST_DIR/2025-03-25-gamma"
+touch "$TEST_DIR/nodateprefix"
+```
+
+**Key testing patterns for TUI actions:**
+- `--and-keys=<keys>` injects key sequences including CTRL-D (delete), CTRL-R (rename), CTRL-G (graduate), CTRL-T (create).
+- `--and-confirm=<text>` pre-fills confirmation dialog input (e.g. YES for delete confirmation).
+- Combine navigation keys (DOWN, UP) before action keys to target specific entries.
+- All TUI output goes to stderr. Script output goes to stdout.
+- `LAB_WIDTH=N LAB_HEIGHT=N` override terminal dimensions.
+
+**Delete mode testing:**
+- CTRL-D marks entry for deletion. Second CTRL-D on same entry unmarks.
+- After marking, ENTER opens confirmation. --and-confirm=YES confirms deletion.
+- Delete script uses basenames: `test -d 'name' && rm -rf 'name'`
+
+**Rename mode testing:**
+- CTRL-R opens rename dialog with current name pre-filled.
+- Type new name then ENTER to confirm.
+- Rename script: `mv 'old' 'new'`
+
+**Graduate mode testing:**
+- CTRL-G opens graduate dialog.
+- For entries with YYYY-MM-DD- prefix, default destination strips the prefix.
+- LAB_PROJECTS env var overrides destination base.
+- For git worktrees (.git file), script uses `git worktree move`.
+- For regular dirs, script uses `mv`.
+
+**Git worktree testing for graduate:**
+```bash
+# Create a git worktree entry
+MAIN_REPO=$(mktemp -d)
+git init "$MAIN_REPO"
+cd "$MAIN_REPO" && git commit --allow-empty -m "init" && git worktree add --detach "$TEST_DIR/2025-01-15-alpha"
+```
+
+**Cleanup:** Always `rm -rf "$TEST_DIR"` at end.
+
+**Evidence:** Save evidence to `/Users/js/.factory/missions/4e064f1d-55c5-4e80-9c43-b2e62ac80846/evidence/tui-actions/<group-id>/`

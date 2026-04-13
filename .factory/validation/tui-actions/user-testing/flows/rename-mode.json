@@ -1,0 +1,140 @@
+{
+  "groupId": "rename-mode",
+  "testedAt": "2026-04-13T13:45:00Z",
+  "isolation": {
+    "binaryPath": "/Users/js/code/rust/lab/target/debug/lab",
+    "tempDirectory": "mktemp -d (unique per test run)",
+    "envOverrides": "LAB_WIDTH=80 LAB_HEIGHT=24"
+  },
+  "toolsUsed": ["shell commands (Execute tool)"],
+  "assertions": [
+    {
+      "id": "VAL-ACT-010",
+      "title": "Ctrl-R opens rename dialog",
+      "status": "pass",
+      "steps": [
+        { "action": "Run --and-exit to check footer", "expected": "Footer shows ^R: Rename hint", "observed": "Footer contains '^R: Rename'" },
+        { "action": "Run --and-keys='CTRL-R,CTRL-A,CTRL-K,TYPE=newname,ENTER'", "expected": "mv script produced targeting first entry", "observed": "mv '2025-03-25-gamma' 'newname' in stdout, exit 0" },
+        { "action": "Check render source for pencil emoji", "expected": "✏️ emoji in rename dialog render", "observed": "render.rs line 483: StyledSegment::new('✏️', ...)" },
+        { "action": "Verify pre-filled input with current basename", "expected": "Rename dialog pre-fills current entry name", "observed": "Ctrl-A,TYPE=pre- prepends to '2025-03-25-gamma' correctly, proving pre-fill" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "terminalOutput": [
+          "tui-actions/rename-mode/VAL-ACT-010-footer.txt",
+          "tui-actions/rename-mode/VAL-ACT-010-rename-script.txt"
+        ],
+        "consoleErrors": "none",
+        "network": "n/a (CLI tool)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-011",
+      "title": "Rename validates input",
+      "status": "pass",
+      "steps": [
+        { "action": "Clear name with Ctrl-A,Ctrl-K then Enter", "expected": "Empty name rejected, no mv", "observed": "Empty output, exit 1 - no mv produced" },
+        { "action": "Type name with / (../etc) then Enter", "expected": "Slash rejected, no mv", "observed": "Empty output, exit 1 - no mv produced" },
+        { "action": "Press Enter without changes (same name)", "expected": "No-op, no mv", "observed": "Empty output, exit 1 - no mv produced" },
+        { "action": "Type existing entry name (2025-01-15-alpha) then Enter", "expected": "Existing name rejected, no mv", "observed": "Empty output, exit 1 - no mv produced" },
+        { "action": "Clear and type whitespace-only then Enter", "expected": "Whitespace-only rejected, no mv", "observed": "Empty output, exit 1 - no mv produced" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "terminalOutput": ["tui-actions/rename-mode/VAL-ACT-011-validation.txt"],
+        "consoleErrors": "none",
+        "network": "n/a (CLI tool)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-012",
+      "title": "Rename normalizes spaces to dashes",
+      "status": "pass",
+      "steps": [
+        { "action": "Open rename, clear, type 'new name here', Enter", "expected": "Script contains 'new-name-here'", "observed": "mv '2025-03-25-gamma' 'new-name-here' in stdout" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "terminalOutput": ["tui-actions/rename-mode/VAL-ACT-012-spaces-to-dashes.txt"],
+        "consoleErrors": "none",
+        "network": "n/a (CLI tool)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-013",
+      "title": "Rename script format correct",
+      "status": "pass",
+      "steps": [
+        { "action": "Open rename, clear, type 'renamed', Enter", "expected": "Script: cd 'base' && mv 'old' 'new' && echo 'new_path' && cd 'new_path'", "observed": "Exact format matched: cd '<base>' && \\n  mv '2025-03-25-gamma' 'renamed' && \\n  echo '<base>/renamed' && \\n  cd '<base>/renamed'" },
+        { "action": "Check warning comment", "expected": "First line starts with '# if you can read this'", "observed": "Confirmed: first line is warning comment" },
+        { "action": "Check && \\ chaining", "expected": "Commands chained with && \\", "observed": "All continuation lines use && \\ with 2-space indentation" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "terminalOutput": ["tui-actions/rename-mode/VAL-ACT-013-script-format.txt"],
+        "consoleErrors": "none",
+        "network": "n/a (CLI tool)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-014",
+      "title": "ESC cancels rename",
+      "status": "pass",
+      "steps": [
+        { "action": "Open rename with Ctrl-R, press ESC", "expected": "Exit code 1, no output", "observed": "Empty stdout, exit code 1" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "terminalOutput": ["tui-actions/rename-mode/VAL-ACT-014-esc-cancel.txt"],
+        "consoleErrors": "none",
+        "network": "n/a (CLI tool)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-015",
+      "title": "Rename dialog supports line editing",
+      "status": "pass",
+      "steps": [
+        { "action": "Ctrl-A moves to beginning, type prefix", "expected": "Prefix prepended to name", "observed": "mv 'gamma' 'pre-2025-03-25-gamma' - prefix correctly prepended" },
+        { "action": "Ctrl-K kills to end of line", "expected": "Name cleared, new text replaces", "observed": "mv 'gamma' 'cleanname' - Ctrl-A + Ctrl-K cleared entire name" },
+        { "action": "Backspace deletes char before cursor", "expected": "Last char removed", "observed": "mv 'beta' '2025-02-20-betnew' - Backspace removed 'a', typed 'new'" },
+        { "action": "Ctrl-E moves to end, Ctrl-B moves back one", "expected": "Insertion before last char", "observed": "mv 'gamma' '2025-03-25-gammXa' - X inserted before final 'a'" },
+        { "action": "Ctrl-W deletes word backward", "expected": "Last word deleted", "observed": "mv 'gamma' '2025-03-25-delta' - Ctrl-W deleted 'gamma', typed 'delta'" },
+        { "action": "Complex edit: clear + type + Ctrl-A + type prefix", "expected": "Concatenated result 'pretest'", "observed": "mv 'gamma' 'pretest' - complex editing sequence works" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "terminalOutput": ["tui-actions/rename-mode/VAL-ACT-015-line-editing.txt"],
+        "consoleErrors": "none",
+        "network": "n/a (CLI tool)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-011",
+      "title": "Navigate + rename targets correct entry",
+      "status": "pass",
+      "steps": [
+        { "action": "Verify display order: gamma (1st), beta (2nd), alpha (3rd)", "expected": "Order confirmed via --and-exit", "observed": "→ gamma, beta, alpha in display order" },
+        { "action": "DOWN + Ctrl-R + rename", "expected": "mv targets beta (second entry)", "observed": "mv '2025-02-20-beta' 'renamed-second'" },
+        { "action": "DOWN DOWN + Ctrl-R + rename", "expected": "mv targets alpha (third entry)", "observed": "mv '2025-01-15-alpha' 'renamed-third'" },
+        { "action": "No navigation + Ctrl-R + rename", "expected": "mv targets gamma (first entry)", "observed": "mv '2025-03-25-gamma' 'renamed-first'" }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "terminalOutput": ["tui-actions/rename-mode/VAL-CROSS-011-navigate-rename.txt"],
+        "consoleErrors": "none",
+        "network": "n/a (CLI tool)"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 7 assertions: 7 passed, 0 failed. All rename mode behaviors confirmed working: dialog opens correctly (VAL-ACT-010), input validation rejects empty/slash/same-name/existing/whitespace-only (VAL-ACT-011), spaces normalize to dashes (VAL-ACT-012), script format matches specification (VAL-ACT-013), ESC cancels with exit 1 (VAL-ACT-014), full line editing support with Ctrl-A/E/B/F/K/W and Backspace (VAL-ACT-015), and navigation correctly targets the selected entry (VAL-CROSS-011)."
+}

@@ -1,0 +1,155 @@
+{
+  "groupId": "graduate-mode",
+  "testedAt": "2026-04-13T13:50:00Z",
+  "isolation": {
+    "binaryPath": "/Users/js/code/rust/lab/target/debug/lab",
+    "testDir": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/tmp.CuTeDnDLLW",
+    "destDir": "/var/folders/rk/9w8x16556m7cx72v5wt4ht8h0000gn/T/tmp.FyAHBee0WJ",
+    "envOverrides": "LAB_WIDTH=80 LAB_HEIGHT=24"
+  },
+  "toolsUsed": ["shell commands (Execute tool)"],
+  "assertions": [
+    {
+      "id": "VAL-ACT-016",
+      "title": "Ctrl-G opens graduate dialog",
+      "status": "pass",
+      "steps": [
+        { "action": "Run lab --and-keys 'CTRL-G,ENTER' on entry 2025-02-20-beta", "expected": "Graduate script emitted on stdout", "observed": "Graduate script emitted with mv, ln -s, echo, touch, echo, cd commands" },
+        { "action": "Verify footer contains Graduate hint", "expected": "^G: Graduate in footer", "observed": "Footer contains 'Graduate' text in --and-exit output" }
+      ],
+      "evidence": {
+        "outputFiles": ["tui-actions/graduate-mode/VAL-ACT-016-graduate-script.txt"],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-017",
+      "title": "Graduate strips date prefix for default name",
+      "status": "pass",
+      "steps": [
+        { "action": "Graduate entry '2025-02-20-beta' with default destination", "expected": "Destination basename is 'beta' (stripped)", "observed": "Destination is <parent>/beta — date prefix correctly stripped" },
+        { "action": "Graduate entry 'nodateprefix' with default destination", "expected": "Destination basename is 'nodateprefix' (full name)", "observed": "Destination is <parent>/nodateprefix — full name correctly kept" }
+      ],
+      "evidence": {
+        "outputFiles": ["tui-actions/graduate-mode/VAL-ACT-017-strip-prefix.txt"],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-018",
+      "title": "LAB_PROJECTS overrides graduate destination",
+      "status": "pass",
+      "steps": [
+        { "action": "Set LAB_PROJECTS to a temp dir, graduate entry '2025-02-20-beta'", "expected": "Destination is LAB_PROJECTS/beta", "observed": "Destination correctly uses LAB_PROJECTS/beta instead of parent-of-LAB_PATH/beta" }
+      ],
+      "evidence": {
+        "outputFiles": ["tui-actions/graduate-mode/VAL-ACT-018-lab-projects.txt"],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-019",
+      "title": "Git worktree graduate uses git worktree move",
+      "status": "pass",
+      "steps": [
+        { "action": "Create git worktree entry (has .git file), graduate it", "expected": "Script uses 'git worktree move'", "observed": "Script starts with 'git worktree move <source> <dest>'" }
+      ],
+      "evidence": {
+        "outputFiles": ["tui-actions/graduate-mode/VAL-ACT-019-worktree-graduate.txt"],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-020",
+      "title": "Regular directory graduate uses mv",
+      "status": "pass",
+      "steps": [
+        { "action": "Graduate regular directory entry (has .git directory or no .git)", "expected": "Script uses 'mv'", "observed": "Script starts with 'mv <source> <dest>', no 'git worktree' present" }
+      ],
+      "evidence": {
+        "outputFiles": ["tui-actions/graduate-mode/VAL-ACT-020-regular-graduate.txt"],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-021",
+      "title": "Graduate creates symlink",
+      "status": "pass",
+      "steps": [
+        { "action": "Graduate a directory entry", "expected": "Script contains 'ln -s <dest> <symlink_in_labs>'", "observed": "Script contains 'ln -s <dest_path> <labs_dir>/<entry_name>'" }
+      ],
+      "evidence": {
+        "outputFiles": ["tui-actions/graduate-mode/VAL-ACT-021-symlink.txt"],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-022",
+      "title": "Graduate script includes cd to destination",
+      "status": "pass",
+      "steps": [
+        { "action": "Graduate a directory entry", "expected": "Script ends with 'cd <destination>'", "observed": "Script ends with 'cd <dest_path>'" }
+      ],
+      "evidence": {
+        "outputFiles": ["tui-actions/graduate-mode/VAL-ACT-022-cd-destination.txt"],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-023",
+      "title": "ESC cancels graduate",
+      "status": "pass",
+      "steps": [
+        { "action": "Open graduate dialog with CTRL-G, press ESC", "expected": "Exit code 1, no stdout", "observed": "Exit code 1, stdout is empty" }
+      ],
+      "evidence": {
+        "outputFiles": ["tui-actions/graduate-mode/VAL-ACT-023-esc-cancel.txt"],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ACT-028",
+      "title": "Graduate validates destination",
+      "status": "pass",
+      "steps": [
+        { "action": "Clear destination and submit empty", "expected": "Rejected, no script", "observed": "Exit 1, no stdout — empty destination rejected" },
+        { "action": "Create directory at default destination, submit", "expected": "Rejected, no script", "observed": "Exit 1, no stdout — existing destination rejected" },
+        { "action": "Type path with nonexistent parent, submit", "expected": "Rejected, no script", "observed": "Exit 1, no stdout — missing parent directory rejected" }
+      ],
+      "evidence": {
+        "outputFiles": ["tui-actions/graduate-mode/VAL-ACT-028-validation.txt"],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-038",
+      "title": "All scripts echo the final path",
+      "status": "pass",
+      "steps": [
+        { "action": "Test cd script (ENTER on existing entry)", "expected": "Contains echo '<path>'", "observed": "Contains echo '<labs_dir>/2025-03-10-worktree'" },
+        { "action": "Test mkdir script (create new entry)", "expected": "Contains echo '<path>'", "observed": "Contains echo '<labs_dir>/2026-04-13-newdir'" },
+        { "action": "Test clone script (lab exec clone <url>)", "expected": "Contains echo '<path>'", "observed": "Contains echo '<labs_dir>/2026-04-13-user-repo'" },
+        { "action": "Test worktree script (lab exec worktree <repo> name)", "expected": "Contains echo '<path>'", "observed": "Contains echo '<labs_dir>/2026-04-13-feature1'" },
+        { "action": "Test rename script (CTRL-R, rename entry)", "expected": "Contains echo '<path>'", "observed": "Contains echo '<labs_dir>/newname'" },
+        { "action": "Test graduate script (CTRL-G, graduate entry)", "expected": "Contains echo '<path>'", "observed": "Contains echo '<parent>/beta'" }
+      ],
+      "evidence": {
+        "outputFiles": ["tui-actions/graduate-mode/VAL-CLI-038-echo-paths.txt"],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 10 assertions: all 10 passed. Graduate mode correctly opens via Ctrl-G, strips date prefixes for default destination, respects LAB_PROJECTS override, uses git worktree move for worktree entries and mv for regular directories, creates symlinks, includes cd to destination, cancels on ESC, validates destination (empty/existing/missing parent), and all 6 script types (cd, mkdir, clone, worktree, rename, graduate) include echo with the final path."
+}
