@@ -57,21 +57,21 @@ In exec mode, delete outputs a shell script that is evaluated by the shell wrapp
 ### Script Structure
 
 ```sh
-cd '/path/to/tries' && \
+cd '/path/to/labs' && \
   test -d 'dir-name-1' ]] && rm -rf 'dir-name-1' && \
   test -d 'dir-name-2' ]] && rm -rf 'dir-name-2' && \
-  cd '/original/pwd' 2>/dev/null || cd '/path/to/tries'
+  cd '/original/pwd' 2>/dev/null || cd '/path/to/labs'
 ```
 
 Each command is on its own line, chained with `&& \` for readability, with 2-space indent on continuation lines.
 
 ### Script Components
 
-1. **Change to tries base directory**
+1. **Change to labs base directory**
    ```sh
-   cd '/path/to/tries' && \
+   cd '/path/to/labs' && \
    ```
-   All deletions happen relative to the tries base path.
+   All deletions happen relative to the labs base path.
 
 2. **Per-item delete commands**
    ```sh
@@ -83,10 +83,10 @@ Each command is on its own line, chained with `&& \` for readability, with 2-spa
 
 3. **PWD restoration**
    ```sh
-    cd '/original/pwd' 2>/dev/null || cd '/path/to/tries'
+    cd '/original/pwd' 2>/dev/null || cd '/path/to/labs'
    ```
    - Attempt to return to original working directory
-   - Fall back to tries base path if original no longer exists
+   - Fall back to labs base path if original no longer exists
    - Avoid shell-specific subshell syntax so output stays shell-neutral
 
 ### Quote Escaping
@@ -97,28 +97,28 @@ All paths use single quotes with proper escaping:
 
 ### Example Output
 
-For deleting two directories from `/home/user/tries`:
+For deleting two directories from `/home/user/labs`:
 
 ```sh
-# if you can read this, you didn't launch try from an alias. run try --help.
-cd '/home/user/tries' && \
+# if you can read this, you didn't launch lab from an alias. run lab --help.
+cd '/home/user/labs' && \
   test -d '2025-11-29-old-project' ]] && rm -rf '2025-11-29-old-project' && \
   test -d '2025-11-28-abandoned' ]] && rm -rf '2025-11-28-abandoned' && \
-  cd '/home/user/code' 2>/dev/null || cd '/home/user/tries'
+  cd '/home/user/code' 2>/dev/null || cd '/home/user/labs'
 ```
 
 ## Safety Guarantees
 
 ### Path Containment
 
-- Deletions only happen within the tries base directory
-- The `cd` to tries base ensures relative paths stay contained
-- No symlink traversal outside tries directory
+- Deletions only happen within the labs base directory
+- The `cd` to labs base ensures relative paths stay contained
+- No symlink traversal outside labs directory
 
 ### PWD Handling
 
 - If shell's PWD is inside a directory being deleted:
-  - Script changes to tries base first
+  - Script changes to labs base first
   - Then performs deletion
   - Attempts to restore PWD (which will fail gracefully)
   - Falls back to $HOME

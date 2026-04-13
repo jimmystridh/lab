@@ -3,8 +3,8 @@
 ## Synopsis
 
 ```
-try [options] [command] [args...]
-try exec [options] [command] [args...]
+lab [options] [command] [args...]
+lab exec [options] [command] [args...]
 ```
 
 ## Description
@@ -17,7 +17,7 @@ try exec [options] [command] [args...]
 |--------|-------------|
 | `--help`, `-h` | Show help text |
 | `--version`, `-v` | Show version number |
-| `--path <dir>` | Override tries directory (default: `~/src/tries`) |
+| `--path <dir>` | Override labs directory (default: `~/src/labs`) |
 | `--no-colors` | Disable ANSI color codes in output |
 
 ## Commands
@@ -27,9 +27,9 @@ try exec [options] [command] [args...]
 Interactive directory selector with fuzzy search.
 
 ```
-try cd [query]
-try exec cd [query]
-try exec [query]        # equivalent to: try exec cd [query]
+lab cd [query]
+lab exec cd [query]
+lab exec [query]        # equivalent to: lab exec cd [query]
 ```
 
 **Arguments:**
@@ -50,9 +50,9 @@ try exec [query]        # equivalent to: try exec cd [query]
 Clone a git repository into a dated directory.
 
 ```
-try clone <url> [name]
-try exec clone <url> [name]
-try <url> [name]            # URL shorthand (same as clone)
+lab clone <url> [name]
+lab exec clone <url> [name]
+lab <url> [name]            # URL shorthand (same as clone)
 ```
 
 **Arguments:**
@@ -66,17 +66,17 @@ try <url> [name]            # URL shorthand (same as clone)
 
 **Examples:**
 ```
-try clone https://github.com/tobi/try.git
-# Creates: 2025-11-30-tobi-try
+lab clone https://github.com/tobi/lab.git
+# Creates: 2025-11-30-tobi-lab
 
-try clone https://github.com/user/repo myproject
+lab clone https://github.com/user/repo myproject
 # Creates: 2025-11-30-myproject (custom name overrides)
 
-try https://github.com/tobi/try.git
+lab https://github.com/tobi/lab.git
 # URL shorthand (same as first example)
 
-try clone git@github.com:tobi/try.git
-# SSH URL also works: 2025-11-30-tobi-try
+lab clone git@github.com:tobi/lab.git
+# SSH URL also works: 2025-11-30-tobi-lab
 ```
 
 ### worktree
@@ -84,9 +84,9 @@ try clone git@github.com:tobi/try.git
 Create a git worktree in a dated directory.
 
 ```
-try worktree <name>
-try exec worktree <name>
-try . <name>              # Shorthand (requires name)
+lab worktree <name>
+lab exec worktree <name>
+lab . <name>              # Shorthand (requires name)
 ```
 
 **Arguments:**
@@ -96,31 +96,31 @@ try . <name>              # Shorthand (requires name)
 - Must be run from within a git repository
 - Creates worktree in `YYYY-MM-DD-<name>`
 - Returns shell script to cd into worktree
-- `try .` without a name is NOT supported (too easy to invoke accidentally)
+- `lab .` without a name is NOT supported (too easy to invoke accidentally)
 
 ### init
 
 Output shell function definition for shell integration.
 
 ```
-try init [path]
+lab init [path]
 ```
 
 **Arguments:**
-- `path` (optional): Override default tries directory
+- `path` (optional): Override default labs directory
 
 **Behavior:**
 - Detects current shell (bash/zsh or fish)
 - Outputs appropriate function definition to stdout
-- Function wraps `try exec` and evals output
+- Function wraps `lab exec` and evals output
 
 **Usage:**
 ```bash
 # bash/zsh
-eval "$(try init ~/src/tries)"
+eval "$(lab init ~/src/labs)"
 
 # fish
-eval (try init ~/src/tries | string collect)
+eval (lab init ~/src/labs | string collect)
 ```
 
 ## Execution Modes
@@ -134,24 +134,24 @@ When `lab` is invoked without `exec`:
 - Prints cd hint for user to copy/paste
 
 ```
-$ try clone https://github.com/user/repo
-Cloning into '/home/user/src/tries/2025-11-30-repo'...
-cd '/home/user/src/tries/2025-11-30-repo'
+$ lab clone https://github.com/user/repo
+Cloning into '/home/user/src/labs/2025-11-30-repo'...
+cd '/home/user/src/labs/2025-11-30-repo'
 ```
 
 ### Exec Mode
 
-When `try exec` is used (typically via shell alias):
+When `lab exec` is used (typically via shell alias):
 
 - Returns shell script to stdout
 - Exit code 0: alias evals output (performs cd)
 - Exit code 1: alias prints output (error/cancel message)
 
 ```
-$ try exec clone https://github.com/user/repo
-# if you can read this, you didn't launch try from an alias. run try --help.
-git clone 'https://github.com/user/repo' '/home/user/src/tries/2025-11-30-repo' && \
-  cd '/home/user/src/tries/2025-11-30-repo'
+$ lab exec clone https://github.com/user/repo
+# if you can read this, you didn't launch lab from an alias. run lab --help.
+git clone 'https://github.com/user/repo' '/home/user/src/labs/2025-11-30-repo' && \
+  cd '/home/user/src/labs/2025-11-30-repo'
 ```
 
 ## Script Output Format
@@ -159,12 +159,12 @@ git clone 'https://github.com/user/repo' '/home/user/src/tries/2025-11-30-repo' 
 All exec mode commands output shell scripts with each command on its own line:
 
 ```bash
-# if you can read this, you didn't launch try from an alias. run try --help.
+# if you can read this, you didn't launch lab from an alias. run lab --help.
 <command> && \
   cd '<path>'
 ```
 
-Commands are chained with `&& \` for readability, with 2-space indent on continuation lines. The warning comment helps users who accidentally run `try exec` directly.
+Commands are chained with `&& \` for readability, with 2-space indent on continuation lines. The warning comment helps users who accidentally run `lab exec` directly.
 
 ## Exit Codes
 
@@ -177,13 +177,13 @@ Commands are chained with `&& \` for readability, with 2-space indent on continu
 
 | Variable | Description |
 |----------|-------------|
-| `HOME` | Used to resolve default tries path (`$HOME/src/tries`) |
+| `HOME` | Used to resolve default labs path (`$HOME/src/labs`) |
 | `SHELL` | Used by `init` to detect shell type |
 | `NO_COLOR` | If set, disables colors (equivalent to `--no-colors`) |
 
 ## Defaults
 
-- **Tries directory**: `~/src/tries`
+- **Labs directory**: `~/src/labs`
 - **Date format**: `YYYY-MM-DD`
 - **Directory naming**: `YYYY-MM-DD-<name>`
 
@@ -203,10 +203,10 @@ The `NO_COLOR` environment variable follows the [no-color.org](https://no-color.
 **Examples:**
 ```bash
 # Using the flag
-try --no-colors --help
+lab --no-colors --help
 
 # Using the environment variable
-NO_COLOR=1 try --help
+NO_COLOR=1 lab --help
 
 # Set globally in shell config
 export NO_COLOR=1
@@ -229,26 +229,26 @@ For test framework documentation including `--and-exit`, `--and-keys`, and test 
 
 ```bash
 # Set up shell integration
-eval "$(try init)"
+eval "$(lab init)"
 
 # Interactive selector
-try
+lab
 
 # Selector with initial filter
-try project
+lab project
 
 # Clone a repository
-try clone https://github.com/user/repo
+lab clone https://github.com/user/repo
 
 # Clone with custom name
-try clone https://github.com/user/repo my-fork
+lab clone https://github.com/user/repo my-fork
 
 # Create git worktree (from within a repo)
-try worktree feature-branch
+lab worktree feature-branch
 
 # Show version
-try --version
+lab --version
 
 # Show help
-try --help
+lab --help
 ```

@@ -6,7 +6,7 @@ The `init` command outputs a shell function definition that must be evaluated (s
 
 The shell function wrapper is necessary because:
 1. A subprocess cannot change the parent shell's working directory
-2. The wrapper captures `try exec` output and `eval`s it in the current shell
+2. The wrapper captures `lab exec` output and `eval`s it in the current shell
 3. This allows commands like `cd` to actually change the current directory
 
 ## Shell Detection
@@ -22,9 +22,9 @@ Supported shells:
 ### Bash/Zsh Format
 
 ```bash
-try() {
+lab() {
   local out
-  out=$('/path/to/try' exec --path '/default/tries/path' "$@" 2>/dev/tty)
+  out=$('/path/to/lab' exec --path '/default/labs/path' "$@" 2>/dev/tty)
   if [ $? -eq 0 ]; then
     eval "$out"
   else
@@ -35,7 +35,7 @@ try() {
 
 Key elements:
 - Function name: `lab`
-- Captures `try exec` output to local variable
+- Captures `lab exec` output to local variable
 - Redirects stderr to `/dev/tty` (TUI renders to stderr)
 - Exit code 0: Evaluates the output (executes cd, git clone, etc.)
 - Exit code non-0: Prints the output (shows error/cancellation message)
@@ -43,8 +43,8 @@ Key elements:
 ### Fish Format
 
 ```fish
-function try
-  set -l out (/path/to/try exec --path '/default/tries/path' $argv 2>/dev/tty | string collect)
+function lab
+  set -l out (/path/to/lab exec --path '/default/labs/path' $argv 2>/dev/tty | string collect)
   if test $pipestatus[1] -eq 0
     eval $out
   else
@@ -57,7 +57,7 @@ end
 
 The init output must embed:
 1. The full path to the `lab` binary (resolved at init time)
-2. The default tries path (typically `~/src/tries`)
+2. The default labs path (typically `~/src/labs`)
 
 This ensures the wrapper always calls the correct binary regardless of `$PATH` changes.
 
@@ -67,22 +67,22 @@ The user should add one of the following to their shell configuration:
 
 ### Bash (~/.bashrc)
 ```bash
-eval "$(try init)"
+eval "$(lab init)"
 ```
 
 ### Zsh (~/.zshrc)
 ```zsh
-eval "$(try init)"
+eval "$(lab init)"
 ```
 
 ### Fish (~/.config/fish/config.fish)
 ```fish
-try init | source
+lab init | source
 ```
 
 ## Exit Code Semantics
 
-The wrapper interprets `try exec` exit codes:
+The wrapper interprets `lab exec` exit codes:
 
 | Exit Code | Meaning | Wrapper Action |
 |-----------|---------|----------------|
@@ -94,14 +94,14 @@ The wrapper interprets `try exec` exit codes:
 Test that init produces valid shell syntax:
 ```bash
 # Test Bash syntax
-bash -n <(try init)
+bash -n <(lab init)
 
 # Test Fish syntax (if fish is available)
-fish -n <(SHELL=/usr/bin/fish try init)
+fish -n <(SHELL=/usr/bin/fish lab init)
 ```
 
 Test that the wrapper works correctly:
 ```bash
-eval "$(try init)"
-try cd  # Should launch selector and cd on selection
+eval "$(lab init)"
+lab cd  # Should launch selector and cd on selection
 ```

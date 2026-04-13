@@ -83,7 +83,7 @@ Displayed: [gray]"2025-11-29-"[reset] + "project"
 ### UI Elements
 
 ```
-"{h1}Try Selector{reset}"
+"{h1}Lab Selector{reset}"
 "{dim}Query:{/fg} {b}user-input{/b}"
 ```
 

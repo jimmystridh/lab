@@ -180,7 +180,7 @@ Tokens are preserved intact - never split a `{b}...{/b}` pair.
 
 ```
 ┌─────────────────────────────────────────────────┐
-│ 📁 Try Selector                                  │
+│ 📁 Lab Selector                                  │
 ├─────────────────────────────────────────────────┤
 │ > user query here                                │
 └─────────────────────────────────────────────────┘
@@ -248,7 +248,7 @@ When query doesn't match any existing directory:
 
 - Show "[new] query-text" as first option
 - Selecting creates `YYYY-MM-DD-query-text` directory
-- New directory is created in tries base path
+- New directory is created in labs base path
 
 ## Directory Deletion
 
@@ -306,13 +306,13 @@ Delete is a multi-step batch operation:
 
 ### Delete Script Output
 
-In exec mode, delete outputs a shell script (like all other actions). The script is evaluated by the shell wrapper, not executed directly by try.
+In exec mode, delete outputs a shell script (like all other actions). The script is evaluated by the shell wrapper, not executed directly by lab.
 
 **Script structure (per item):**
 ```sh
 /usr/bin/env sh -c '
   target=$(realpath "/path/to/dir");
-  base=$(realpath "/tries/base");
+  base=$(realpath "/labs/base");
   case "$target" in "$base/"*) ;; *) exit 1;; esac;
   case "$(pwd)/" in "$target/"*) cd "$base";; esac;
   rm -rf "$target"
@@ -325,14 +325,14 @@ Multiple marked items emit multiple delete commands chained with `&&`.
 
 **Path validation (CRITICAL):**
 - Resolve target to realpath before deletion
-- Verify realpath starts with tries base directory + "/"
-- Reject if target is outside tries directory
+- Verify realpath starts with labs base directory + "/"
+- Reject if target is outside labs directory
 
 **PWD handling:**
 - Check if `$(pwd)/` starts with `$target/`
-- If inside, `cd` to tries base first
+- If inside, `cd` to labs base first
 - Then `rm -rf` the resolved path
 
 This order prevents:
-1. Deleting directories outside the tries folder (symlink attacks)
+1. Deleting directories outside the labs folder (symlink attacks)
 2. Leaving the shell in an invalid state (deleted PWD)

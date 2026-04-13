@@ -36,7 +36,7 @@ Renders the TUI exactly once without waiting for input, then exits with code 1 (
 **Example:**
 ```bash
 # Capture TUI render to check display
-output=$(./try --path=/tmp/test --and-exit exec 2>&1)
+output=$(./lab --path=/tmp/test --and-exit exec 2>&1)
 
 # Verify score format is shown
 echo "$output" | grep -qE "[0-9]+\.[0-9]"
@@ -110,19 +110,19 @@ Printable characters are passed literally.
 
 ```bash
 # Type "beta" then press Enter to select matching entry
-output=$(./try --path=/tmp/test --and-keys="beta"$'\r' exec 2>/dev/null)
+output=$(./lab --path=/tmp/test --and-keys="beta"$'\r' exec 2>/dev/null)
 
 # Press Escape to cancel
-output=$(./try --path=/tmp/test --and-keys=$'\x1b' exec 2>/dev/null)
+output=$(./lab --path=/tmp/test --and-keys=$'\x1b' exec 2>/dev/null)
 
 # Navigate down twice, then up once, then select
-output=$(./try --path=/tmp/test --and-keys=$'\x1b[B\x1b[B\x1b[A\r' exec 2>/dev/null)
+output=$(./lab --path=/tmp/test --and-keys=$'\x1b[B\x1b[B\x1b[A\r' exec 2>/dev/null)
 
 # Type and delete with backspace
-output=$(./try --path=/tmp/test --and-keys="xyz"$'\x7f\x7f\x7f'"abc"$'\r' exec 2>/dev/null)
+output=$(./lab --path=/tmp/test --and-keys="xyz"$'\x7f\x7f\x7f'"abc"$'\r' exec 2>/dev/null)
 
 # Use vim-style navigation (Ctrl-J down, Ctrl-K up)
-output=$(./try --path=/tmp/test --and-keys=$'\x0a\x0b\r' exec 2>/dev/null)
+output=$(./lab --path=/tmp/test --and-keys=$'\x0a\x0b\r' exec 2>/dev/null)
 ```
 
 ### Behavior by Terminating Key
@@ -153,8 +153,8 @@ Disables all ANSI styling codes (colors, bold, dim, reset). Cursor control seque
 **Use case:** Testing output in colorless environments.
 
 ```bash
-output_colors=$(./try --and-exit exec 2>&1)
-output_plain=$(./try --no-colors --and-exit exec 2>&1)
+output_colors=$(./lab --and-exit exec 2>&1)
+output_plain=$(./lab --no-colors --and-exit exec 2>&1)
 
 # output_colors should have ANSI codes, output_plain should not
 ```
@@ -182,11 +182,11 @@ When both `--and-exit` and `--and-keys` are used:
 
 Test files in `spec/tests/` are sourced by the runner. They have access to:
 
-- `lab_run` - Function that runs try with proper command expansion
+- `lab_run` - Function that runs lab with proper command expansion
 - `pass` - Mark test as passed
 - `fail "description" "expected" "got" "spec_ref"` - Mark test as failed
 - `section "name"` - Start a new test section
-- `$TEST_LABS` - Path to test tries directory with sample entries
+- `$TEST_LABS` - Path to test labs directory with sample entries
 
 ### Test Patterns
 
@@ -261,10 +261,10 @@ These allow testing layout and truncation behavior without needing an actual ter
 
 ```bash
 # Test with 400-character wide terminal
-LAB_WIDTH=400 ./try --path="$TEST_LABS" --and-exit exec 2>&1
+LAB_WIDTH=400 ./lab --path="$TEST_LABS" --and-exit exec 2>&1
 
 # Test narrow terminal
-LAB_WIDTH=40 LAB_HEIGHT=10 ./try --and-exit exec 2>&1
+LAB_WIDTH=40 LAB_HEIGHT=10 ./lab --and-exit exec 2>&1
 ```
 
 ## Test Environment

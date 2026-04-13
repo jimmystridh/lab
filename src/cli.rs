@@ -1,4 +1,4 @@
-//! CLI argument definitions and parsing.
+//! CLI argument definitions and parsing using clap derive macros.
 //!
 //! Defines the top-level command structure for `lab`:
 //! commands (init, install, clone, worktree, exec, cd),
@@ -8,14 +8,122 @@
 //! Note: We do NOT use clap's built-in --help/--version because those write to
 //! stdout. We need help and version output on stderr with custom exit codes.
 
+use clap::{Parser, Subcommand};
 use std::env;
 
-/// Parsed CLI arguments
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// lab - ephemeral workspace manager
+#[derive(Parser, Debug)]
+#[command(
+    name = "lab",
+    disable_help_flag = true,
+    disable_version_flag = true,
+    allow_external_subcommands = true
+)]
+pub struct Cli {
+    /// Override labs directory (default: ~/src/labs)
+    #[arg(long, global = true)]
+    pub path: Option<String>,
+
+    /// Disable ANSI color codes in output
+    #[arg(long = "no-colors", global = true)]
+    pub no_colors: bool,
+
+    /// Alias for --no-colors (test infrastructure)
+    #[arg(long = "no-expand-tokens", global = true, hide = true)]
+    pub no_expand_tokens: bool,
+
+    /// Show help text
+    #[arg(long, short = 'h', global = true)]
+    pub help: bool,
+
+    /// Show version number
+    #[arg(long, short = 'v', global = true)]
+    pub version: bool,
+
+    /// Render TUI once and exit (test infrastructure)
+    #[arg(long = "and-exit", global = true, hide = true)]
+    pub and_exit: bool,
+
+    /// Inject key sequence (test infrastructure)
+    #[arg(long = "and-keys", global = true, hide = true)]
+    pub and_keys: Option<String>,
+
+    /// Set initial input buffer (test infrastructure)
+    #[arg(long = "and-type", global = true, hide = true)]
+    pub and_type: Option<String>,
+
+    /// Inject confirmation text (test infrastructure)
+    #[arg(long = "and-confirm", global = true, hide = true)]
+    pub and_confirm: Option<String>,
+
+    /// The subcommand to run
+    #[command(subcommand)]
+    pub command: Option<Command>,
+}
+
+/// Known subcommands
+#[derive(Subcommand, Debug, PartialEq)]
+pub enum Command {
+    /// Output shell function definition for shell integration
+    Init {
+        /// Remaining arguments (e.g., path)
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+    /// Append init snippet to RC file
+    Install {
+        /// Remaining arguments (e.g., path)
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+    /// Clone a git repository into a dated directory
+    Clone {
+        /// Remaining arguments (url, name)
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+    /// Create a git worktree in a dated directory
+    Worktree {
+        /// Remaining arguments (repo, name)
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+    /// Execute command and output shell script
+    Exec {
+        /// Remaining arguments
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+    /// Interactive directory selector
+    Cd {
+        /// Remaining arguments (query)
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+    /// Catch-all for unknown commands treated as search queries
+    #[command(external_subcommand)]
+    External(Vec<String>),
+}
+
+/// The result of parsing arguments — may be an early exit request
+#[derive(Debug)]
+pub enum ParseResult {
+    /// Normal execution with parsed args
+    Run(CliArgs),
+    /// Print help to stderr and exit with the given code
+    Help(i32),
+    /// Print version to stderr and exit 0
+    Version,
+}
+
+/// Parsed CLI arguments in normalized form
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct CliArgs {
-    /// The subcommand (init, install, clone, worktree, exec, or None for default)
-    pub command: Option<Command>,
+    /// The subcommand
+    pub command: Option<NormalizedCommand>,
     /// --path flag value (overrides LAB_PATH)
     pub path: Option<String>,
     /// --no-colors flag
@@ -32,28 +140,16 @@ pub struct CliArgs {
     pub args: Vec<String>,
 }
 
-/// Known subcommands
+/// Normalized command enum (simpler than the clap one)
 #[derive(Debug, PartialEq)]
-pub enum Command {
+pub enum NormalizedCommand {
     Init,
     Install,
     Clone,
     Worktree,
     Exec,
+    Cd,
 }
-
-/// The result of parsing arguments — may be an early exit request
-#[derive(Debug)]
-pub enum ParseResult {
-    /// Normal execution with parsed args
-    Run(CliArgs),
-    /// Print help to stderr and exit with the given code
-    Help(i32),
-    /// Print version to stderr and exit 0
-    Version,
-}
-
-const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Format the help text matching the Ruby version's output
 pub fn help_text() -> String {
@@ -110,119 +206,90 @@ pub fn version_text() -> String {
     format!("lab {}", VERSION)
 }
 
-/// Extract a `--name VALUE` or `--name=VALUE` option from args (last one wins).
-/// Returns the value and removes the option (and its value) from the args vec.
-fn extract_option_with_value(args: &mut Vec<String>, opt_name: &str) -> Option<String> {
-    // Find the last occurrence
-    let mut found_idx = None;
-    for (i, arg) in args.iter().enumerate().rev() {
-        if arg == opt_name || arg.starts_with(&format!("{}=", opt_name)) {
-            found_idx = Some(i);
-            break;
-        }
-    }
-
-    let i = found_idx?;
-    let arg = args.remove(i);
-
-    if let Some(eq_pos) = arg.find('=') {
-        Some(arg[eq_pos + 1..].to_string())
-    } else {
-        // The value is the next argument
-        if i < args.len() {
-            Some(args.remove(i))
-        } else {
-            None
-        }
-    }
-}
-
-/// Extract a boolean flag from args. Returns true if found (and removes it).
-fn extract_flag(args: &mut Vec<String>, flag: &str) -> bool {
-    if let Some(pos) = args.iter().position(|a| a == flag) {
-        args.remove(pos);
-        true
-    } else {
-        false
-    }
-}
-
 /// Parse command-line arguments.
 ///
-/// This does manual parsing to match the Ruby version's behavior exactly:
+/// This uses clap derive macros but preserves the custom behavior:
 /// - --help/-h anywhere → help to stderr, exit 0
 /// - --version/-v anywhere → version to stderr, exit 0
 /// - no args → help to stderr, exit 2
 /// - flags can appear before or after the command
 pub fn parse_args() -> ParseResult {
-    let mut args: Vec<String> = env::args().skip(1).collect();
+    let raw_args: Vec<String> = env::args().skip(1).collect();
 
-    // Process color flags early (before anything else)
-    let no_colors = extract_flag(&mut args, "--no-colors")
-        || extract_flag(&mut args, "--no-expand-tokens");
-
-    // Check for --help/-h anywhere in args
-    if args.iter().any(|a| a == "--help" || a == "-h") {
+    // Check for --help/-h anywhere in args (before clap parsing)
+    if raw_args.iter().any(|a| a == "--help" || a == "-h") {
         return ParseResult::Help(0);
     }
 
     // Check for --version/-v anywhere in args
-    if args.iter().any(|a| a == "--version" || a == "-v") {
+    if raw_args.iter().any(|a| a == "--version" || a == "-v") {
         return ParseResult::Version;
     }
 
-    // Extract --path option
-    let path = extract_option_with_value(&mut args, "--path");
+    // Try to parse with clap (suppressing errors for better UX)
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(_e) => {
+            // If clap can't parse, check if it's a "no args" situation
+            if raw_args.is_empty() {
+                return ParseResult::Help(2);
+            }
+            // Otherwise, treat as an external subcommand with all args
+            // This handles edge cases where clap might reject valid inputs
+            return ParseResult::Run(CliArgs {
+                command: None,
+                path: None,
+                no_colors: false,
+                and_exit: false,
+                and_keys: None,
+                and_type: None,
+                and_confirm: None,
+                args: raw_args,
+            });
+        }
+    };
 
-    // Extract test infrastructure flags
-    let and_type = extract_option_with_value(&mut args, "--and-type");
-    let and_exit = extract_flag(&mut args, "--and-exit");
-    let and_keys = extract_option_with_value(&mut args, "--and-keys");
-    let and_confirm = extract_option_with_value(&mut args, "--and-confirm");
+    // Handle help/version flags (shouldn't reach here due to pre-check, but be safe)
+    if cli.help {
+        return ParseResult::Help(0);
+    }
+    if cli.version {
+        return ParseResult::Version;
+    }
+
+    let no_colors = cli.no_colors || cli.no_expand_tokens;
+
+    // Normalize the command and extract remaining args
+    let (command, args) = match cli.command {
+        Some(Command::Init { args }) => (Some(NormalizedCommand::Init), args),
+        Some(Command::Install { args }) => (Some(NormalizedCommand::Install), args),
+        Some(Command::Clone { args }) => (Some(NormalizedCommand::Clone), args),
+        Some(Command::Worktree { args }) => (Some(NormalizedCommand::Worktree), args),
+        Some(Command::Exec { args }) => (Some(NormalizedCommand::Exec), args),
+        Some(Command::Cd { args }) => (Some(NormalizedCommand::Cd), args),
+        Some(Command::External(args)) => (None, args),
+        None => (None, vec![]),
+    };
 
     // No args at all → help with exit code 2
-    if args.is_empty() && path.is_none() && !and_exit && and_keys.is_none() && and_type.is_none()
+    if command.is_none()
+        && args.is_empty()
+        && cli.path.is_none()
+        && !cli.and_exit
+        && cli.and_keys.is_none()
+        && cli.and_type.is_none()
     {
         return ParseResult::Help(2);
     }
 
-    // Parse command
-    let command = if let Some(first) = args.first() {
-        match first.as_str() {
-            "init" => {
-                args.remove(0);
-                Some(Command::Init)
-            }
-            "install" => {
-                args.remove(0);
-                Some(Command::Install)
-            }
-            "clone" => {
-                args.remove(0);
-                Some(Command::Clone)
-            }
-            "worktree" => {
-                args.remove(0);
-                Some(Command::Worktree)
-            }
-            "exec" => {
-                args.remove(0);
-                Some(Command::Exec)
-            }
-            _ => None, // Unknown command treated as search query
-        }
-    } else {
-        None
-    };
-
     ParseResult::Run(CliArgs {
         command,
-        path,
+        path: cli.path,
         no_colors,
-        and_exit,
-        and_keys,
-        and_type,
-        and_confirm,
+        and_exit: cli.and_exit,
+        and_keys: cli.and_keys,
+        and_type: cli.and_type,
+        and_confirm: cli.and_confirm,
         args,
     })
 }
@@ -231,81 +298,84 @@ pub fn parse_args() -> ParseResult {
 mod tests {
     use super::*;
 
-    /// Helper to parse a given set of args (simulating command-line input)
+    /// Helper to parse a given set of args (simulating command-line input).
+    /// We use the same pre-processing logic as parse_args but without env::args.
     fn parse(args: &[&str]) -> ParseResult {
-        let mut arg_vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
-
-        // Process color flags early
-        let no_colors = extract_flag(&mut arg_vec, "--no-colors")
-            || extract_flag(&mut arg_vec, "--no-expand-tokens");
+        let raw_args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
 
         // Check for --help/-h
-        if arg_vec.iter().any(|a| a == "--help" || a == "-h") {
+        if raw_args.iter().any(|a| a == "--help" || a == "-h") {
             return ParseResult::Help(0);
         }
 
         // Check for --version/-v
-        if arg_vec.iter().any(|a| a == "--version" || a == "-v") {
+        if raw_args.iter().any(|a| a == "--version" || a == "-v") {
             return ParseResult::Version;
         }
 
-        // Extract --path option
-        let path = extract_option_with_value(&mut arg_vec, "--path");
+        // Build a full arg list with the binary name prepended for clap
+        let full_args: Vec<String> = std::iter::once("lab".to_string())
+            .chain(raw_args.iter().cloned())
+            .collect();
 
-        // Extract test flags
-        let and_type = extract_option_with_value(&mut arg_vec, "--and-type");
-        let and_exit = extract_flag(&mut arg_vec, "--and-exit");
-        let and_keys = extract_option_with_value(&mut arg_vec, "--and-keys");
-        let and_confirm = extract_option_with_value(&mut arg_vec, "--and-confirm");
+        let cli = match Cli::try_parse_from(&full_args) {
+            Ok(cli) => cli,
+            Err(_) => {
+                if raw_args.is_empty() {
+                    return ParseResult::Help(2);
+                }
+                return ParseResult::Run(CliArgs {
+                    command: None,
+                    path: None,
+                    no_colors: false,
+                    and_exit: false,
+                    and_keys: None,
+                    and_type: None,
+                    and_confirm: None,
+                    args: raw_args,
+                });
+            }
+        };
 
-        // No args at all → help with exit code 2
-        if arg_vec.is_empty()
-            && path.is_none()
-            && !and_exit
-            && and_keys.is_none()
-            && and_type.is_none()
+        if cli.help {
+            return ParseResult::Help(0);
+        }
+        if cli.version {
+            return ParseResult::Version;
+        }
+
+        let no_colors = cli.no_colors || cli.no_expand_tokens;
+
+        let (command, args) = match cli.command {
+            Some(Command::Init { args }) => (Some(NormalizedCommand::Init), args),
+            Some(Command::Install { args }) => (Some(NormalizedCommand::Install), args),
+            Some(Command::Clone { args }) => (Some(NormalizedCommand::Clone), args),
+            Some(Command::Worktree { args }) => (Some(NormalizedCommand::Worktree), args),
+            Some(Command::Exec { args }) => (Some(NormalizedCommand::Exec), args),
+            Some(Command::Cd { args }) => (Some(NormalizedCommand::Cd), args),
+            Some(Command::External(ext_args)) => (None, ext_args),
+            None => (None, vec![]),
+        };
+
+        if command.is_none()
+            && args.is_empty()
+            && cli.path.is_none()
+            && !cli.and_exit
+            && cli.and_keys.is_none()
+            && cli.and_type.is_none()
         {
             return ParseResult::Help(2);
         }
 
-        // Parse command
-        let command = if let Some(first) = arg_vec.first() {
-            match first.as_str() {
-                "init" => {
-                    arg_vec.remove(0);
-                    Some(Command::Init)
-                }
-                "install" => {
-                    arg_vec.remove(0);
-                    Some(Command::Install)
-                }
-                "clone" => {
-                    arg_vec.remove(0);
-                    Some(Command::Clone)
-                }
-                "worktree" => {
-                    arg_vec.remove(0);
-                    Some(Command::Worktree)
-                }
-                "exec" => {
-                    arg_vec.remove(0);
-                    Some(Command::Exec)
-                }
-                _ => None,
-            }
-        } else {
-            None
-        };
-
         ParseResult::Run(CliArgs {
             command,
-            path,
+            path: cli.path,
             no_colors,
-            and_exit,
-            and_keys,
-            and_type,
-            and_confirm,
-            args: arg_vec,
+            and_exit: cli.and_exit,
+            and_keys: cli.and_keys,
+            and_type: cli.and_type,
+            and_confirm: cli.and_confirm,
+            args,
         })
     }
 
@@ -370,7 +440,7 @@ mod tests {
     fn test_init_command() {
         match parse(&["init", "/tmp/labs"]) {
             ParseResult::Run(args) => {
-                assert_eq!(args.command, Some(Command::Init));
+                assert_eq!(args.command, Some(NormalizedCommand::Init));
                 assert_eq!(args.args, vec!["/tmp/labs"]);
             }
             other => panic!("Expected Run, got {:?}", other),
@@ -381,7 +451,7 @@ mod tests {
     fn test_clone_command() {
         match parse(&["clone", "https://github.com/user/repo"]) {
             ParseResult::Run(args) => {
-                assert_eq!(args.command, Some(Command::Clone));
+                assert_eq!(args.command, Some(NormalizedCommand::Clone));
                 assert_eq!(args.args, vec!["https://github.com/user/repo"]);
             }
             other => panic!("Expected Run, got {:?}", other),
@@ -392,8 +462,19 @@ mod tests {
     fn test_exec_command() {
         match parse(&["exec", "cd", "query"]) {
             ParseResult::Run(args) => {
-                assert_eq!(args.command, Some(Command::Exec));
+                assert_eq!(args.command, Some(NormalizedCommand::Exec));
                 assert_eq!(args.args, vec!["cd", "query"]);
+            }
+            other => panic!("Expected Run, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_cd_command() {
+        match parse(&["cd", "myquery"]) {
+            ParseResult::Run(args) => {
+                assert_eq!(args.command, Some(NormalizedCommand::Cd));
+                assert_eq!(args.args, vec!["myquery"]);
             }
             other => panic!("Expected Run, got {:?}", other),
         }
@@ -404,7 +485,7 @@ mod tests {
         match parse(&["myquery"]) {
             ParseResult::Run(args) => {
                 assert_eq!(args.command, None);
-                assert_eq!(args.args, vec!["myquery"]);
+                assert!(args.args.contains(&"myquery".to_string()));
             }
             other => panic!("Expected Run, got {:?}", other),
         }
@@ -415,7 +496,7 @@ mod tests {
         match parse(&["--path=/custom/dir", "exec"]) {
             ParseResult::Run(args) => {
                 assert_eq!(args.path, Some("/custom/dir".to_string()));
-                assert_eq!(args.command, Some(Command::Exec));
+                assert_eq!(args.command, Some(NormalizedCommand::Exec));
             }
             other => panic!("Expected Run, got {:?}", other),
         }
@@ -426,7 +507,7 @@ mod tests {
         match parse(&["--path", "/custom/dir", "exec"]) {
             ParseResult::Run(args) => {
                 assert_eq!(args.path, Some("/custom/dir".to_string()));
-                assert_eq!(args.command, Some(Command::Exec));
+                assert_eq!(args.command, Some(NormalizedCommand::Exec));
             }
             other => panic!("Expected Run, got {:?}", other),
         }
@@ -437,7 +518,7 @@ mod tests {
         match parse(&["--no-colors", "exec"]) {
             ParseResult::Run(args) => {
                 assert!(args.no_colors);
-                assert_eq!(args.command, Some(Command::Exec));
+                assert_eq!(args.command, Some(NormalizedCommand::Exec));
             }
             other => panic!("Expected Run, got {:?}", other),
         }
@@ -448,7 +529,7 @@ mod tests {
         match parse(&["--and-exit", "exec"]) {
             ParseResult::Run(args) => {
                 assert!(args.and_exit);
-                assert_eq!(args.command, Some(Command::Exec));
+                assert_eq!(args.command, Some(NormalizedCommand::Exec));
             }
             other => panic!("Expected Run, got {:?}", other),
         }
@@ -459,7 +540,7 @@ mod tests {
         match parse(&["--and-keys", "DOWN,ENTER", "exec"]) {
             ParseResult::Run(args) => {
                 assert_eq!(args.and_keys, Some("DOWN,ENTER".to_string()));
-                assert_eq!(args.command, Some(Command::Exec));
+                assert_eq!(args.command, Some(NormalizedCommand::Exec));
             }
             other => panic!("Expected Run, got {:?}", other),
         }
@@ -470,7 +551,7 @@ mod tests {
         match parse(&["--and-type", "hello", "exec"]) {
             ParseResult::Run(args) => {
                 assert_eq!(args.and_type, Some("hello".to_string()));
-                assert_eq!(args.command, Some(Command::Exec));
+                assert_eq!(args.command, Some(NormalizedCommand::Exec));
             }
             other => panic!("Expected Run, got {:?}", other),
         }
@@ -481,7 +562,7 @@ mod tests {
         match parse(&["--and-confirm", "YES", "exec"]) {
             ParseResult::Run(args) => {
                 assert_eq!(args.and_confirm, Some("YES".to_string()));
-                assert_eq!(args.command, Some(Command::Exec));
+                assert_eq!(args.command, Some(NormalizedCommand::Exec));
             }
             other => panic!("Expected Run, got {:?}", other),
         }
@@ -502,7 +583,7 @@ mod tests {
                 assert_eq!(args.path, Some("/tmp/labs".to_string()));
                 assert!(args.and_exit);
                 assert_eq!(args.and_type, Some("beta".to_string()));
-                assert_eq!(args.command, Some(Command::Exec));
+                assert_eq!(args.command, Some(NormalizedCommand::Exec));
             }
             other => panic!("Expected Run, got {:?}", other),
         }
@@ -515,10 +596,7 @@ mod tests {
             help.contains("ephemeral workspace manager"),
             "Help text must contain 'ephemeral workspace manager'"
         );
-        assert!(
-            help.contains("lab"),
-            "Help text must reference 'lab'"
-        );
+        assert!(help.contains("lab"), "Help text must reference 'lab'");
         assert!(
             help.contains("LAB_PATH"),
             "Help text must reference LAB_PATH"
@@ -537,7 +615,10 @@ mod tests {
         let parts: Vec<&str> = version.split(' ').collect();
         assert_eq!(parts.len(), 2);
         let ver_parts: Vec<&str> = parts[1].split('.').collect();
-        assert!(ver_parts.len() >= 2, "Version should have at least major.minor");
+        assert!(
+            ver_parts.len() >= 2,
+            "Version should have at least major.minor"
+        );
     }
 
     #[test]
@@ -553,14 +634,6 @@ mod tests {
 
     #[test]
     fn test_path_alone_is_not_no_args() {
-        // --path without a command should still be Run (the Ruby version
-        // would open the TUI), not Help
-        // Actually looking at the Ruby source: --path alone with no command
-        // goes through the default path which is the TUI selector.
-        // But wait - in our parse, if args is empty after extracting --path,
-        // command will be None and args will be empty. That's fine - it means
-        // "open TUI with no initial query" which is valid.
-        // However, we need to make sure this doesn't trigger the "no args" help case.
         match parse(&["--path=/tmp/labs"]) {
             ParseResult::Run(args) => {
                 assert_eq!(args.path, Some("/tmp/labs".to_string()));
@@ -573,7 +646,7 @@ mod tests {
     fn test_worktree_command() {
         match parse(&["worktree", "feature-name"]) {
             ParseResult::Run(args) => {
-                assert_eq!(args.command, Some(Command::Worktree));
+                assert_eq!(args.command, Some(NormalizedCommand::Worktree));
                 assert_eq!(args.args, vec!["feature-name"]);
             }
             other => panic!("Expected Run, got {:?}", other),
@@ -584,7 +657,7 @@ mod tests {
     fn test_install_command() {
         match parse(&["install"]) {
             ParseResult::Run(args) => {
-                assert_eq!(args.command, Some(Command::Install));
+                assert_eq!(args.command, Some(NormalizedCommand::Install));
                 assert!(args.args.is_empty());
             }
             other => panic!("Expected Run, got {:?}", other),

@@ -64,15 +64,43 @@ pub fn detect_shell() -> Option<Shell> {
     None
 }
 
-/// Get the parent process name via `ps`.
+/// Get the parent process name.
+///
+/// On Linux, reads `/proc/<ppid>/exe` to resolve the binary path.
+/// On macOS (and other Unix), uses `ps -p <ppid> -o comm=`.
 fn get_parent_process_name() -> Option<String> {
     let ppid = std::os::unix::process::parent_id();
+
+    // On Linux, try /proc/<ppid>/exe first
+    #[cfg(target_os = "linux")]
+    {
+        let exe_path = format!("/proc/{}/exe", ppid);
+        if let Ok(resolved) = std::fs::read_link(&exe_path) {
+            let name = resolved
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            if !name.is_empty() {
+                return Some(name);
+            }
+        }
+    }
+
+    // Fallback (macOS and Linux): use ps -p <ppid> -o comm=
     let output = Command::new("ps")
-        .args(["c", "-p", &ppid.to_string(), "-o", "ucomm="])
+        .args(["-p", &ppid.to_string(), "-o", "comm="])
         .output()
         .ok()?;
     if output.status.success() {
-        let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if raw.is_empty() {
+            return None;
+        }
+        // ps -o comm= may return a full path; extract the basename
+        let name = std::path::Path::new(&raw)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or(raw);
         if name.is_empty() {
             None
         } else {
@@ -225,6 +253,16 @@ mod tests {
             result.is_some() || true,
             "detect_shell should work in test environment"
         );
+    }
+
+    #[test]
+    fn test_get_parent_process_name_returns_something() {
+        // In a test environment, we should be able to detect the parent process
+        let result = get_parent_process_name();
+        // The parent should be cargo or the test runner
+        assert!(result.is_some(), "Should detect parent process name");
+        let name = result.unwrap();
+        assert!(!name.is_empty(), "Parent process name should not be empty");
     }
 
     // ---- Shell RC file tests ----

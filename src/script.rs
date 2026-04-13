@@ -5,6 +5,7 @@
 //! commands chained with `&& \`, and 2-space indented continuations.
 
 use crate::util::quote_path;
+use std::env;
 
 /// Warning comment emitted as the first line of every script.
 /// If the user sees this, they invoked `lab` directly instead of through the shell alias.
@@ -109,7 +110,11 @@ pub fn script_worktree(path: &str, repo: Option<&str>) -> Vec<String> {
         )
     };
 
-    let src = repo.unwrap_or(".");
+    let src = repo.map(|r| r.to_string()).unwrap_or_else(|| {
+        env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| ".".to_string())
+    });
     let mut cmds = vec![
         format!("mkdir -p {}", q_path),
         format!(
@@ -331,8 +336,15 @@ mod tests {
         let cmds = script_worktree("/tmp/labs/2025-01-15-feature", None);
         assert_eq!(cmds.len(), 6);
         assert!(cmds[1].contains("Using git worktree"));
-        // When no repo, source is "."
-        assert!(cmds[1].contains("from ."));
+        // When no repo, source should be absolute cwd path (not ".")
+        let cwd = std::env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| ".".to_string());
+        assert!(
+            cmds[1].contains(&format!("from {}.", cwd)),
+            "Echo should contain absolute cwd path, got: {}",
+            cmds[1]
+        );
         assert!(cmds[2].contains("git rev-parse --is-inside-work-tree"));
         assert!(!cmds[2].contains("git -C '"));
     }

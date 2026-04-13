@@ -52,6 +52,13 @@ pub fn cmd_clone(uri: Option<&str>, custom_name: Option<&str>, labs_path: &str) 
         }
     };
 
+    // Always validate the URI is parseable, even with a custom name.
+    // An unparseable URI means git clone will fail, so reject early.
+    if git::parse_git_uri(uri).is_none() {
+        eprintln!("Error: Unable to parse git URI: {}", uri);
+        return 1;
+    }
+
     let dir_name = match generate_clone_directory_name(uri, custom_name) {
         Some(name) => name,
         None => {
@@ -215,5 +222,12 @@ mod tests {
     fn test_cmd_clone_ssh_uri() {
         let code = cmd_clone(Some("git@github.com:user/repo"), None, "/tmp/labs");
         assert_eq!(code, 0);
+    }
+
+    #[test]
+    fn test_cmd_clone_unparseable_uri_with_custom_name() {
+        // Even with a custom name, an unparseable URI should fail
+        let code = cmd_clone(Some("not-a-valid-uri"), Some("myproject"), "/tmp/labs");
+        assert_eq!(code, 1, "Unparseable URI should be rejected even with custom name");
     }
 }

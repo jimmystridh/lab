@@ -175,16 +175,16 @@ fn main() {
 
             // Dispatch based on command
             match args.command {
-                Some(cli::Command::Init) => {
+                Some(cli::NormalizedCommand::Init) => {
                     commands::init::cmd_init(&args.args, &labs_path.to_string_lossy());
                     process::exit(0);
                 }
-                Some(cli::Command::Install) => {
+                Some(cli::NormalizedCommand::Install) => {
                     let exit_code =
                         commands::install::cmd_install(&args.args, &labs_path.to_string_lossy());
                     process::exit(exit_code);
                 }
-                Some(cli::Command::Clone) => {
+                Some(cli::NormalizedCommand::Clone) => {
                     let uri = args.args.first().map(|s| s.as_str());
                     let custom_name = args.args.get(1).map(|s| s.as_str());
                     let exit_code = commands::clone::cmd_clone(
@@ -194,14 +194,27 @@ fn main() {
                     );
                     process::exit(exit_code);
                 }
-                Some(cli::Command::Worktree) => {
+                Some(cli::NormalizedCommand::Worktree) => {
                     let exit_code =
                         commands::worktree::cmd_worktree(&args.args, &labs_path.to_string_lossy());
                     process::exit(exit_code);
                 }
-                Some(cli::Command::Exec) => {
+                Some(cli::NormalizedCommand::Exec) => {
                     let labs = labs_path.to_string_lossy().to_string();
                     let exit_code = dispatch_exec(
+                        &args.args,
+                        &labs,
+                        args.and_exit,
+                        args.and_keys.as_deref(),
+                        args.and_type.as_deref(),
+                        args.and_confirm.as_deref(),
+                    );
+                    process::exit(exit_code);
+                }
+                Some(cli::NormalizedCommand::Cd) => {
+                    // cd command: same as exec cd
+                    let labs = labs_path.to_string_lossy().to_string();
+                    let exit_code = commands::cd::cmd_cd(
                         &args.args,
                         &labs,
                         args.and_exit,

@@ -102,18 +102,29 @@ pub fn cmd_worktree(args: &[String], labs_path: &str) -> i32 {
 
     let full_path = worktree_path(labs_path, &repo_dir, custom_name.as_deref());
 
-    // Determine whether to pass repo or not: if it's cwd, pass None
-    let cwd = env::current_dir()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_default();
-    let repo_for_script = if repo_dir == cwd {
-        None
-    } else {
-        Some(repo_dir.as_str())
-    };
+    // Check if the repo directory is actually a git repo before emitting worktree commands.
+    // .git can be a directory (regular repos) or a file (worktrees).
+    let git_path = Path::new(&repo_dir).join(".git");
+    if git_path.exists() {
+        // Git repo → worktree script
+        // Determine whether to pass repo or not: if it's cwd, pass None
+        let cwd = env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let repo_for_script = if repo_dir == cwd {
+            None
+        } else {
+            Some(repo_dir.as_str())
+        };
 
-    let cmds = script::script_worktree(&full_path, repo_for_script);
-    script::emit_script(&cmds);
+        let cmds = script::script_worktree(&full_path, repo_for_script);
+        script::emit_script(&cmds);
+    } else {
+        // Non-git directory → mkdir script (fallback)
+        let cmds = script::script_mkdir_cd(&full_path);
+        script::emit_script(&cmds);
+    }
+
     0
 }
 
@@ -259,5 +270,33 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let exit_code = cmd_dot(".", &[], dir.path().to_str().unwrap());
         assert_eq!(exit_code, 1);
+    }
+
+    #[test]
+    fn test_cmd_worktree_non_git_uses_mkdir() {
+        // When invoked from a non-git directory, worktree should fallback to mkdir
+        let labs_dir = tempfile::tempdir().unwrap();
+        let non_git_dir = tempfile::tempdir().unwrap();
+        // The worktree command with a non-git repo should still succeed (exit 0)
+        // and use mkdir instead of worktree commands.
+        // We just verify it doesn't crash and returns 0.
+        let args = vec![
+            non_git_dir.path().to_string_lossy().to_string(),
+            "testname".to_string(),
+        ];
+        let exit_code = cmd_worktree(&args, labs_dir.path().to_str().unwrap());
+        assert_eq!(exit_code, 0, "Non-git worktree should succeed with mkdir fallback");
+    }
+
+    #[test]
+    fn test_cmd_dot_non_git_uses_mkdir() {
+        // When invoked from a non-git directory, dot should use mkdir
+        let labs_dir = tempfile::tempdir().unwrap();
+        let non_git_dir = tempfile::tempdir().unwrap();
+        let old_dir = env::current_dir().unwrap();
+        let _ = env::set_current_dir(non_git_dir.path());
+        let exit_code = cmd_dot(".", &["testname".to_string()], labs_dir.path().to_str().unwrap());
+        let _ = env::set_current_dir(&old_dir);
+        assert_eq!(exit_code, 0, "Non-git dot should succeed with mkdir fallback");
     }
 }
