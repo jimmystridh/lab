@@ -15,7 +15,9 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub fn handle_key(app: &mut App, key: KeyEvent) -> Option<TuiOutcome> {
     match key.code {
         KeyCode::Enter => Some(selection_outcome(app.current_selection())),
-        KeyCode::Esc => Some(TuiOutcome::Cancelled { emit_message: true }),
+        KeyCode::Esc => Some(TuiOutcome::Cancelled {
+            emit_message: false,
+        }),
         KeyCode::Backspace => {
             app.backspace();
             None
@@ -65,7 +67,9 @@ fn handle_control_key(app: &mut App, character: char) -> Option<TuiOutcome> {
             app.move_input_back();
             None
         }
-        'c' => Some(TuiOutcome::Cancelled { emit_message: true }),
+        'c' => Some(TuiOutcome::Cancelled {
+            emit_message: false,
+        }),
         'e' => {
             app.move_input_to_end();
             None
@@ -210,6 +214,37 @@ mod tests {
         assert_eq!(
             outcome,
             Some(TuiOutcome::Selected(PathBuf::from("/tmp/2025-11-15-beta")))
+        );
+    }
+
+    #[test]
+    fn test_escape_cancels_without_stdout_message_flag() {
+        let mut app = make_app(None);
+
+        let outcome = handle_key(&mut app, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+
+        assert_eq!(
+            outcome,
+            Some(TuiOutcome::Cancelled {
+                emit_message: false
+            })
+        );
+    }
+
+    #[test]
+    fn test_ctrl_c_cancels_without_stdout_message_flag() {
+        let mut app = make_app(None);
+
+        let outcome = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+        );
+
+        assert_eq!(
+            outcome,
+            Some(TuiOutcome::Cancelled {
+                emit_message: false
+            })
         );
     }
 

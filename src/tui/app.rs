@@ -144,7 +144,11 @@ impl App {
         }
 
         let date_prefix = Local::now().format("%Y-%m-%d");
-        Some(format!("{}-{}", date_prefix, self.input.replace(' ', "-")))
+        Some(format!(
+            "{}-{}",
+            date_prefix,
+            normalize_create_name_fragment(&self.input)
+        ))
     }
 
     /// Resolve the current selection to an existing path or create-new path.
@@ -326,6 +330,25 @@ fn is_allowed_input_char(character: char) -> bool {
     character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.' | ' ')
 }
 
+fn normalize_create_name_fragment(input: &str) -> String {
+    let mut normalized = String::with_capacity(input.len());
+    let mut previous_was_whitespace = false;
+
+    for character in input.chars() {
+        if character.is_whitespace() {
+            if !previous_was_whitespace {
+                normalized.push('-');
+                previous_was_whitespace = true;
+            }
+        } else {
+            normalized.push(character);
+            previous_was_whitespace = false;
+        }
+    }
+
+    normalized
+}
+
 fn resolve_dimension(override_value: Option<&str>, detected: u16, default: u16) -> u16 {
     override_value
         .and_then(|value| value.parse::<u16>().ok())
@@ -390,6 +413,13 @@ mod tests {
         let new_name = app.create_new_name().expect("create-new name");
         assert!(new_name.ends_with("new-project"));
         assert_eq!(app.input, "new project");
+    }
+
+    #[test]
+    fn test_create_new_name_collapses_consecutive_spaces_to_single_dash() {
+        let app = make_app(Some("new  project"));
+        let new_name = app.create_new_name().expect("create-new name");
+        assert!(new_name.ends_with("new-project"));
     }
 
     #[test]

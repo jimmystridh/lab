@@ -42,7 +42,7 @@ pub fn cmd_cd(
         }
     };
 
-    emit_outcome(outcome)
+    emit_outcome(outcome, Path::new(labs_path))
 }
 
 fn initial_input(args: &[String], and_type: Option<&str>) -> String {
@@ -51,30 +51,41 @@ fn initial_input(args: &[String], and_type: Option<&str>) -> String {
         .unwrap_or_else(|| args.join(" "))
 }
 
-fn emit_outcome(outcome: TuiOutcome) -> i32 {
+fn emit_outcome(outcome: TuiOutcome, labs_path: &Path) -> i32 {
+    if let Some(commands) = commands_for_outcome(&outcome, labs_path) {
+        script::emit_script(&commands);
+        0
+    } else {
+        1
+    }
+}
+
+fn commands_for_outcome(outcome: &TuiOutcome, labs_path: &Path) -> Option<Vec<String>> {
     match outcome {
         TuiOutcome::Selected(path) => {
-            let commands = script::script_cd(path.to_string_lossy().as_ref());
-            script::emit_script(&commands);
-            0
+            let path = path.to_string_lossy().into_owned();
+            Some(script::script_cd(&path))
         }
-        TuiOutcome::Create(path) => {
-            let commands = script::script_mkdir_cd(path.to_string_lossy().as_ref());
-            script::emit_script(&commands);
-            0
-        }
-        TuiOutcome::Cancelled { emit_message } => {
-            if emit_message {
-                println!("Cancelled.");
-            }
-            1
-        }
+        TuiOutcome::Create(path) => Some(create_commands(path, labs_path)),
+        TuiOutcome::Cancelled { .. } => None,
+    }
+}
+
+fn create_commands(path: &Path, labs_path: &Path) -> Vec<String> {
+    let path = path.to_string_lossy().into_owned();
+
+    if labs_path.join(".git").exists() {
+        let repo = labs_path.to_string_lossy().into_owned();
+        script::script_worktree(&path, Some(&repo))
+    } else {
+        script::script_mkdir_cd(&path)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn test_cmd_cd_and_exit_returns_1() {
@@ -176,5 +187,54 @@ mod tests {
         let exit_code = cmd_cd(&[], dir.path().to_str().unwrap(), false, None, None, None);
 
         assert_eq!(exit_code, 1);
+    }
+
+    #[test]
+    fn test_commands_for_cancelled_outcome_return_none() {
+        let dir = tempfile::tempdir().expect("tempdir");
+
+        let commands = commands_for_outcome(
+            &TuiOutcome::Cancelled {
+                emit_message: false,
+            },
+            dir.path(),
+        );
+
+        assert!(commands.is_none());
+    }
+
+    #[test]
+    fn test_create_outcome_uses_mkdir_commands_when_labs_path_is_not_git_repo() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("2026-04-13-feature");
+
+        let commands = commands_for_outcome(&TuiOutcome::Create(path.clone()), dir.path())
+            .expect("create commands");
+
+        assert_eq!(
+            commands[0],
+            format!("mkdir -p '{}'", path.to_string_lossy())
+        );
+        assert!(commands
+            .iter()
+            .all(|command| !command.contains("worktree add")));
+    }
+
+    #[test]
+    fn test_create_outcome_uses_worktree_commands_when_labs_path_is_git_repo() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::create_dir(dir.path().join(".git")).expect("git dir");
+        let path = dir.path().join("2026-04-13-feature");
+
+        let commands = commands_for_outcome(&TuiOutcome::Create(path.clone()), dir.path())
+            .expect("create commands");
+
+        assert_eq!(
+            commands[0],
+            format!("mkdir -p '{}'", path.to_string_lossy())
+        );
+        assert!(commands[1].contains("Using git worktree"));
+        assert!(commands[2].contains("worktree add --detach"));
+        assert!(commands[2].contains(&format!("git -C '{}'", dir.path().to_string_lossy())));
     }
 }

@@ -41,7 +41,7 @@ pub enum TuiOutcome {
     Selected(PathBuf),
     /// Virtual create-new entry selected.
     Create(PathBuf),
-    /// Selector cancelled. `emit_message` controls whether stdout prints "Cancelled."
+    /// Selector cancelled without emitting a shell script.
     Cancelled { emit_message: bool },
 }
 

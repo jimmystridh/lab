@@ -70,10 +70,7 @@ pub fn script_clone(path: &str, uri: &str) -> Vec<String> {
         format!("mkdir -p {}", quote_path(path)),
         format!(
             "echo {}",
-            quote_path(&format!(
-                "Using git clone to create this lab from {}.",
-                uri
-            ))
+            quote_path(&format!("Using git clone to create this lab from {}.", uri))
         ),
         format!("git clone '{}' {}", uri, quote_path(path)),
     ];
@@ -96,16 +93,16 @@ pub fn script_worktree(path: &str, repo: Option<&str>) -> Vec<String> {
     let worktree_cmd = if let Some(r) = repo {
         let q_repo = quote_path(r);
         format!(
-            "/usr/bin/env sh -c 'if git -C {} rev-parse --is-inside-work-tree >/dev/null 2>&1; \
+            "/usr/bin/env sh -c \"if git -C {} rev-parse --is-inside-work-tree >/dev/null 2>&1; \
              then repo=$(git -C {} rev-parse --show-toplevel); \
-             git -C \"$repo\" worktree add --detach {} >/dev/null 2>&1 || true; fi; exit 0'",
+             git -C \\\"$repo\\\" worktree add --detach {} >/dev/null 2>&1 || true; fi; exit 0\"",
             q_repo, q_repo, q_path
         )
     } else {
         format!(
-            "/usr/bin/env sh -c 'if git rev-parse --is-inside-work-tree >/dev/null 2>&1; \
+            "/usr/bin/env sh -c \"if git rev-parse --is-inside-work-tree >/dev/null 2>&1; \
              then repo=$(git rev-parse --show-toplevel); \
-             git -C \"$repo\" worktree add --detach {} >/dev/null 2>&1 || true; fi; exit 0'",
+             git -C \\\"$repo\\\" worktree add --detach {} >/dev/null 2>&1 || true; fi; exit 0\"",
             q_path
         )
     };
@@ -133,6 +130,10 @@ pub fn script_worktree(path: &str, repo: Option<&str>) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{
+        io::Write,
+        process::{Command, ExitStatus, Stdio},
+    };
 
     // ---- emit_script tests ----
 
@@ -160,10 +161,27 @@ mod tests {
         output
     }
 
+    fn shell_syntax_check(script: &str) -> ExitStatus {
+        let mut child = Command::new("/bin/sh")
+            .arg("-n")
+            .stdin(Stdio::piped())
+            .spawn()
+            .expect("spawn /bin/sh -n");
+        child
+            .stdin
+            .as_mut()
+            .expect("stdin")
+            .write_all(script.as_bytes())
+            .expect("write script");
+        child.wait().expect("wait for syntax check")
+    }
+
     #[test]
     fn test_emit_script_warning_header() {
         let output = capture_emit_script(&["echo hello".to_string()]);
-        assert!(output.starts_with("# if you can read this, you didn't launch lab from an alias. run lab --help.\n"));
+        assert!(output.starts_with(
+            "# if you can read this, you didn't launch lab from an alias. run lab --help.\n"
+        ));
     }
 
     #[test]
@@ -203,26 +221,35 @@ mod tests {
 
     #[test]
     fn test_emit_script_first_command_not_indented() {
-        let output = capture_emit_script(&[
-            "cmd1".to_string(),
-            "cmd2".to_string(),
-            "cmd3".to_string(),
-        ]);
+        let output =
+            capture_emit_script(&["cmd1".to_string(), "cmd2".to_string(), "cmd3".to_string()]);
         let lines: Vec<&str> = output.lines().collect();
-        assert!(!lines[1].starts_with(' '), "First command should not be indented");
-        assert!(lines[2].starts_with("  "), "Second command should be 2-space indented");
-        assert!(lines[3].starts_with("  "), "Third command should be 2-space indented");
+        assert!(
+            !lines[1].starts_with(' '),
+            "First command should not be indented"
+        );
+        assert!(
+            lines[2].starts_with("  "),
+            "Second command should be 2-space indented"
+        );
+        assert!(
+            lines[3].starts_with("  "),
+            "Third command should be 2-space indented"
+        );
     }
 
     #[test]
     fn test_emit_script_last_command_no_trailing_chain() {
-        let output = capture_emit_script(&[
-            "cmd1".to_string(),
-            "cmd2".to_string(),
-        ]);
+        let output = capture_emit_script(&["cmd1".to_string(), "cmd2".to_string()]);
         let lines: Vec<&str> = output.lines().collect();
-        assert!(lines[1].ends_with(" && \\"), "Non-last command should have && \\");
-        assert!(!lines[2].ends_with(" && \\"), "Last command should NOT have && \\");
+        assert!(
+            lines[1].ends_with(" && \\"),
+            "Non-last command should have && \\"
+        );
+        assert!(
+            !lines[2].ends_with(" && \\"),
+            "Last command should NOT have && \\"
+        );
     }
 
     // ---- script_cd tests ----
@@ -282,7 +309,10 @@ mod tests {
 
     #[test]
     fn test_script_clone_basic() {
-        let cmds = script_clone("/tmp/labs/2025-01-15-user-repo", "https://github.com/user/repo");
+        let cmds = script_clone(
+            "/tmp/labs/2025-01-15-user-repo",
+            "https://github.com/user/repo",
+        );
         assert_eq!(cmds.len(), 6);
         assert_eq!(cmds[0], "mkdir -p '/tmp/labs/2025-01-15-user-repo'");
         assert_eq!(
@@ -321,11 +351,30 @@ mod tests {
         let cmds = script_worktree("/tmp/labs/2025-01-15-feature", Some("/Users/js/myrepo"));
         assert_eq!(cmds.len(), 6, "Expected 6 commands, got: {:?}", cmds);
         assert_eq!(cmds[0], "mkdir -p '/tmp/labs/2025-01-15-feature'");
-        assert!(cmds[1].contains("Using git worktree"), "cmds[1] = {:?}", cmds[1]);
-        assert!(cmds[1].contains("/Users/js/myrepo"), "cmds[1] = {:?}", cmds[1]);
-        assert!(cmds[2].contains("worktree add --detach"), "cmds[2] = {:?}", cmds[2]);
-        assert!(cmds[2].contains("'/Users/js/myrepo'"), "cmds[2] = {:?}", cmds[2]);
-        assert!(cmds[2].starts_with("/usr/bin/env sh -c"), "cmds[2] should start with sh -c");
+        assert!(
+            cmds[1].contains("Using git worktree"),
+            "cmds[1] = {:?}",
+            cmds[1]
+        );
+        assert!(
+            cmds[1].contains("/Users/js/myrepo"),
+            "cmds[1] = {:?}",
+            cmds[1]
+        );
+        assert!(
+            cmds[2].contains("worktree add --detach"),
+            "cmds[2] = {:?}",
+            cmds[2]
+        );
+        assert!(
+            cmds[2].contains("'/Users/js/myrepo'"),
+            "cmds[2] = {:?}",
+            cmds[2]
+        );
+        assert!(
+            cmds[2].starts_with("/usr/bin/env sh -c"),
+            "cmds[2] should start with sh -c"
+        );
         assert_eq!(cmds[3], "touch '/tmp/labs/2025-01-15-feature'");
         assert_eq!(cmds[4], "echo '/tmp/labs/2025-01-15-feature'");
         assert_eq!(cmds[5], "cd '/tmp/labs/2025-01-15-feature'");
@@ -363,6 +412,18 @@ mod tests {
         assert!(cmds[0].contains("'\"'\"'"));
     }
 
+    #[test]
+    fn test_script_worktree_output_has_valid_shell_syntax() {
+        let cmds = script_worktree("/tmp/labs/2025-01-15-feature", Some("/Users/js/myrepo"));
+        let output = capture_emit_script(&cmds);
+        let status = shell_syntax_check(&output);
+
+        assert!(
+            status.success(),
+            "expected sh -n to accept emitted worktree script, got {status:?}"
+        );
+    }
+
     // ---- Integration: emit_script with script builders ----
 
     #[test]
@@ -392,7 +453,10 @@ mod tests {
 
     #[test]
     fn test_clone_script_full_output() {
-        let cmds = script_clone("/tmp/labs/2025-01-15-user-repo", "https://github.com/user/repo");
+        let cmds = script_clone(
+            "/tmp/labs/2025-01-15-user-repo",
+            "https://github.com/user/repo",
+        );
         let output = capture_emit_script(&cmds);
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(lines.len(), 7); // warning + 6 commands
