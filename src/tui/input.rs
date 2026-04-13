@@ -74,6 +74,10 @@ fn handle_control_key(app: &mut App, character: char) -> Option<TuiOutcome> {
             app.move_input_forward();
             None
         }
+        'h' => {
+            app.backspace();
+            None
+        }
         'j' | 'n' => {
             app.move_down();
             None
@@ -271,6 +275,105 @@ mod tests {
     }
 
     #[test]
+    fn test_ctrl_a_e_b_and_f_move_input_cursor_within_bounds() {
+        let mut app = make_app(Some("beta"));
+
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert_eq!(app.input_cursor_pos, 0);
+
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('b'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert_eq!(app.input_cursor_pos, 0);
+
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert_eq!(app.input_cursor_pos, 1);
+
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('e'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert_eq!(app.input_cursor_pos, 4);
+
+        assert!(handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+        )
+        .is_none());
+        assert_eq!(app.input_cursor_pos, 4);
+    }
+
+    #[test]
+    fn test_backspace_re_evaluates_matches_after_deleting_before_cursor() {
+        let mut app = make_app(Some("betaa"));
+        app.cursor_pos = 2;
+        app.scroll_offset = 1;
+
+        let outcome = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
+        );
+
+        assert!(outcome.is_none());
+        assert_eq!(app.input, "beta");
+        assert_eq!(app.input_cursor_pos, 4);
+        assert_eq!(app.cursor_pos, 0);
+        assert_eq!(app.scroll_offset, 0);
+        assert_eq!(app.filtered.len(), 1);
+        assert_eq!(app.entries[app.filtered[0].index].name, "2025-11-15-beta");
+    }
+
+    #[test]
+    fn test_ctrl_k_kills_to_end_and_re_evaluates_matches() {
+        let mut app = make_app(Some("alphabeta"));
+        app.cursor_pos = 2;
+        app.scroll_offset = 1;
+        app.input_cursor_pos = 5;
+
+        let outcome = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('k'), KeyModifiers::CONTROL),
+        );
+
+        assert!(outcome.is_none());
+        assert_eq!(app.input, "alpha");
+        assert_eq!(app.input_cursor_pos, 5);
+        assert_eq!(app.cursor_pos, 0);
+        assert_eq!(app.scroll_offset, 0);
+        assert_eq!(app.filtered.len(), 1);
+        assert_eq!(app.entries[app.filtered[0].index].name, "2025-11-01-alpha");
+    }
+
+    #[test]
+    fn test_ctrl_w_deletes_previous_word_but_keeps_boundary_characters() {
+        let mut app = make_app(Some("hello-world"));
+        app.cursor_pos = 2;
+        app.scroll_offset = 1;
+
+        let outcome = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL),
+        );
+
+        assert!(outcome.is_none());
+        assert_eq!(app.input, "hello-");
+        assert_eq!(app.input_cursor_pos, 6);
+        assert_eq!(app.cursor_pos, 0);
+        assert_eq!(app.scroll_offset, 0);
+    }
+
+    #[test]
     fn test_ctrl_k_without_buffer_change_keeps_selection_position() {
         let mut app = make_app(Some("beta"));
         app.cursor_pos = 2;
@@ -284,5 +387,21 @@ mod tests {
         assert!(outcome.is_none());
         assert_eq!(app.input, "beta");
         assert_eq!(app.cursor_pos, 2);
+    }
+
+    #[test]
+    fn test_ctrl_h_aliases_backspace_behavior() {
+        let mut app = make_app(Some("betaa"));
+
+        let outcome = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('h'), KeyModifiers::CONTROL),
+        );
+
+        assert!(outcome.is_none());
+        assert_eq!(app.input, "beta");
+        assert_eq!(app.input_cursor_pos, 4);
+        assert_eq!(app.filtered.len(), 1);
+        assert_eq!(app.entries[app.filtered[0].index].name, "2025-11-15-beta");
     }
 }

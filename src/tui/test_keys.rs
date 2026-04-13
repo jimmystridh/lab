@@ -94,6 +94,10 @@ fn parse_ctrl_symbolic(token: &str) -> Option<KeyEvent> {
         return None;
     }
 
+    if ch == 'H' {
+        return Some(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE));
+    }
+
     Some(KeyEvent::new(
         KeyCode::Char(ch.to_ascii_lowercase()),
         KeyModifiers::CONTROL,
@@ -287,6 +291,16 @@ mod tests {
                 KeyEvent::new(KeyCode::Down, KeyModifiers::NONE),
                 KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
             ]
+        );
+    }
+
+    #[test]
+    fn test_parse_ctrl_h_as_backspace() {
+        let events = parse_and_keys("CTRL-H");
+
+        assert_eq!(
+            events,
+            vec![KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE)]
         );
     }
 
