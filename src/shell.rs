@@ -246,13 +246,14 @@ mod tests {
         // This test depends on the SHELL env, which we can't control in unit tests.
         // Instead test the logic by examining the env.
         // The integration tests via spec tests cover this properly.
-        // Here we just verify detect_shell returns Some (it should in CI/dev environments).
+        // Here we verify detection can run and returns a populated variant when available.
         let result = detect_shell();
-        // We can't assert a specific shell, just that detection works
-        assert!(
-            result.is_some() || true,
-            "detect_shell should work in test environment"
-        );
+        if let Some(shell) = result {
+            assert!(
+                !format!("{shell:?}").is_empty(),
+                "detected shell should be printable"
+            );
+        }
     }
 
     #[test]
@@ -302,15 +303,36 @@ mod tests {
 
     #[test]
     fn test_init_snippet_bash_with_explicit_path() {
-        let snippet = init_snippet(Shell::Bash, "/usr/local/bin/lab", "~/src/labs", Some("/tmp/labs"));
-        assert!(snippet.contains("lab() {"), "should contain lab() {{ function: {}", snippet);
+        let snippet = init_snippet(
+            Shell::Bash,
+            "/usr/local/bin/lab",
+            "~/src/labs",
+            Some("/tmp/labs"),
+        );
+        assert!(
+            snippet.contains("lab() {"),
+            "should contain lab() {{ function: {}",
+            snippet
+        );
         assert!(snippet.contains("local out"), "should declare local out");
-        assert!(snippet.contains("/usr/local/bin/lab"), "should contain binary path");
-        assert!(snippet.contains("--path '/tmp/labs'"), "should hardcode explicit path");
-        assert!(snippet.contains("2>/dev/tty"), "should redirect stderr to tty");
+        assert!(
+            snippet.contains("/usr/local/bin/lab"),
+            "should contain binary path"
+        );
+        assert!(
+            snippet.contains("--path '/tmp/labs'"),
+            "should hardcode explicit path"
+        );
+        assert!(
+            snippet.contains("2>/dev/tty"),
+            "should redirect stderr to tty"
+        );
         assert!(snippet.contains("eval \"$out\""), "should eval on success");
         assert!(snippet.contains("echo \"$out\""), "should echo on failure");
-        assert!(snippet.contains("if [ $? -eq 0 ]; then"), "should check exit code");
+        assert!(
+            snippet.contains("if [ $? -eq 0 ]; then"),
+            "should check exit code"
+        );
     }
 
     #[test]
@@ -326,9 +348,17 @@ mod tests {
 
     #[test]
     fn test_init_snippet_bash_valid_syntax() {
-        let snippet = init_snippet(Shell::Bash, "/usr/local/bin/lab", "~/src/labs", Some("/tmp/labs"));
+        let snippet = init_snippet(
+            Shell::Bash,
+            "/usr/local/bin/lab",
+            "~/src/labs",
+            Some("/tmp/labs"),
+        );
         // Basic checks that it's valid shell-like syntax
-        assert!(snippet.contains("lab() {"), "should have function declaration");
+        assert!(
+            snippet.contains("lab() {"),
+            "should have function declaration"
+        );
         assert!(snippet.contains("}"), "should have closing brace");
         assert!(snippet.contains("fi"), "should close if statement");
     }
@@ -344,21 +374,35 @@ mod tests {
 
     #[test]
     fn test_init_snippet_fish_with_explicit_path() {
-        let snippet = init_snippet(Shell::Fish, "/usr/local/bin/lab", "~/src/labs", Some("/tmp/labs"));
+        let snippet = init_snippet(
+            Shell::Fish,
+            "/usr/local/bin/lab",
+            "~/src/labs",
+            Some("/tmp/labs"),
+        );
         assert!(
             snippet.contains("function lab"),
             "should contain fish function: {}",
             snippet
         );
-        assert!(snippet.contains("--path '/tmp/labs'"), "should hardcode explicit path");
-        assert!(snippet.contains("2>/dev/tty"), "should redirect stderr to tty");
+        assert!(
+            snippet.contains("--path '/tmp/labs'"),
+            "should hardcode explicit path"
+        );
+        assert!(
+            snippet.contains("2>/dev/tty"),
+            "should redirect stderr to tty"
+        );
         assert!(
             snippet.contains("$pipestatus[1]"),
             "should use pipestatus for fish: {}",
             snippet
         );
         assert!(snippet.contains("end"), "should close with end");
-        assert!(snippet.contains("string collect"), "should use string collect");
+        assert!(
+            snippet.contains("string collect"),
+            "should use string collect"
+        );
     }
 
     #[test]
@@ -384,14 +428,20 @@ mod tests {
     #[test]
     fn test_init_snippet_fish_no_bash_isms() {
         let snippet = init_snippet(Shell::Fish, "/bin/lab", "~/src/labs", Some("/tmp/labs"));
-        assert!(!snippet.contains("$()"), "fish snippet must not contain $()");
+        assert!(
+            !snippet.contains("$()"),
+            "fish snippet must not contain $()"
+        );
         assert!(!snippet.contains("$?"), "fish snippet must not contain $?");
     }
 
     #[test]
     fn test_init_snippet_fish_no_bash_isms_no_path() {
         let snippet = init_snippet(Shell::Fish, "/bin/lab", "~/src/labs", None);
-        assert!(!snippet.contains("$()"), "fish snippet must not contain $()");
+        assert!(
+            !snippet.contains("$()"),
+            "fish snippet must not contain $()"
+        );
         assert!(!snippet.contains("$?"), "fish snippet must not contain $?");
     }
 
@@ -405,8 +455,14 @@ mod tests {
             "~/src/labs",
             Some("/tmp/labs"),
         );
-        assert!(snippet.contains("function lab"), "should contain function lab");
-        assert!(snippet.contains("$LASTEXITCODE"), "should check LASTEXITCODE");
+        assert!(
+            snippet.contains("function lab"),
+            "should contain function lab"
+        );
+        assert!(
+            snippet.contains("$LASTEXITCODE"),
+            "should check LASTEXITCODE"
+        );
         assert!(
             snippet.contains("Invoke-Expression"),
             "should invoke expression on success"

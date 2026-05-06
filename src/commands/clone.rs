@@ -83,8 +83,7 @@ mod tests {
 
     #[test]
     fn test_generate_name_https_github() {
-        let name =
-            generate_clone_directory_name("https://github.com/user/repo", None).unwrap();
+        let name = generate_clone_directory_name("https://github.com/user/repo", None).unwrap();
         // Should match YYYY-MM-DD-user-repo
         let today = Local::now().format("%Y-%m-%d").to_string();
         assert_eq!(name, format!("{}-user-repo", today));
@@ -92,8 +91,7 @@ mod tests {
 
     #[test]
     fn test_generate_name_strips_git_suffix() {
-        let name =
-            generate_clone_directory_name("https://github.com/user/repo.git", None).unwrap();
+        let name = generate_clone_directory_name("https://github.com/user/repo.git", None).unwrap();
         let today = Local::now().format("%Y-%m-%d").to_string();
         assert_eq!(name, format!("{}-user-repo", today));
         assert!(!name.contains(".git"));
@@ -101,46 +99,37 @@ mod tests {
 
     #[test]
     fn test_generate_name_ssh_github() {
-        let name =
-            generate_clone_directory_name("git@github.com:user/repo", None).unwrap();
+        let name = generate_clone_directory_name("git@github.com:user/repo", None).unwrap();
         let today = Local::now().format("%Y-%m-%d").to_string();
         assert_eq!(name, format!("{}-user-repo", today));
     }
 
     #[test]
     fn test_generate_name_ssh_with_git_suffix() {
-        let name =
-            generate_clone_directory_name("git@github.com:user/myrepo.git", None).unwrap();
+        let name = generate_clone_directory_name("git@github.com:user/myrepo.git", None).unwrap();
         let today = Local::now().format("%Y-%m-%d").to_string();
         assert_eq!(name, format!("{}-user-myrepo", today));
     }
 
     #[test]
     fn test_generate_name_custom_name() {
-        let name = generate_clone_directory_name(
-            "https://github.com/user/repo",
-            Some("myproject"),
-        )
-        .unwrap();
+        let name = generate_clone_directory_name("https://github.com/user/repo", Some("myproject"))
+            .unwrap();
         let today = Local::now().format("%Y-%m-%d").to_string();
         assert_eq!(name, format!("{}-myproject", today));
     }
 
     #[test]
     fn test_generate_name_custom_name_overrides_user_repo() {
-        let name = generate_clone_directory_name(
-            "https://github.com/user/repo",
-            Some("custom"),
-        )
-        .unwrap();
+        let name =
+            generate_clone_directory_name("https://github.com/user/repo", Some("custom")).unwrap();
         assert!(name.contains("custom"));
         assert!(!name.contains("user-repo"));
     }
 
     #[test]
     fn test_generate_name_empty_custom_falls_back() {
-        let name =
-            generate_clone_directory_name("https://github.com/user/repo", Some("")).unwrap();
+        let name = generate_clone_directory_name("https://github.com/user/repo", Some("")).unwrap();
         let today = Local::now().format("%Y-%m-%d").to_string();
         assert_eq!(name, format!("{}-user-repo", today));
     }
@@ -153,8 +142,7 @@ mod tests {
 
     #[test]
     fn test_generate_name_date_prefix_format() {
-        let name =
-            generate_clone_directory_name("https://github.com/user/repo", None).unwrap();
+        let name = generate_clone_directory_name("https://github.com/user/repo", None).unwrap();
         // Check date prefix format: YYYY-MM-DD-
         assert!(
             name.chars().nth(4) == Some('-')
@@ -167,8 +155,7 @@ mod tests {
 
     #[test]
     fn test_generate_name_gitlab() {
-        let name =
-            generate_clone_directory_name("https://gitlab.com/user/glrepo", None).unwrap();
+        let name = generate_clone_directory_name("https://gitlab.com/user/glrepo", None).unwrap();
         let today = Local::now().format("%Y-%m-%d").to_string();
         assert_eq!(name, format!("{}-user-glrepo", today));
     }
@@ -228,6 +215,9 @@ mod tests {
     fn test_cmd_clone_unparseable_uri_with_custom_name() {
         // Even with a custom name, an unparseable URI should fail
         let code = cmd_clone(Some("not-a-valid-uri"), Some("myproject"), "/tmp/labs");
-        assert_eq!(code, 1, "Unparseable URI should be rejected even with custom name");
+        assert_eq!(
+            code, 1,
+            "Unparseable URI should be rejected even with custom name"
+        );
     }
 }

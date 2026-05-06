@@ -67,10 +67,7 @@ pub fn cmd_install(args: &[String], labs_path: &str) -> i32 {
             Ok(contents) => {
                 if contents.contains(MARKER) {
                     eprintln!("lab is already installed in {}", rc_path.display());
-                    eprintln!(
-                        "To reinstall, remove the '{}' block first.",
-                        MARKER
-                    );
+                    eprintln!("To reinstall, remove the '{}' block first.", MARKER);
                     return 0;
                 }
             }
@@ -91,9 +88,7 @@ pub fn cmd_install(args: &[String], labs_path: &str) -> i32 {
         if let Ok(meta) = fs::metadata(&rc_path) {
             if meta.permissions().readonly() {
                 eprintln!("Warning: {} is read-only, skipping.", rc_path.display());
-                eprintln!(
-                    "Run 'lab init' and manually add the output to your shell config."
-                );
+                eprintln!("Run 'lab init' and manually add the output to your shell config.");
                 return 1;
             }
         }
@@ -223,7 +218,11 @@ mod tests {
         let rc_path = tmp.path().join(".testrc");
 
         // Write initial content with marker
-        fs::write(&rc_path, format!("# existing stuff\n{}\nlab() {{ }}\n", MARKER)).unwrap();
+        fs::write(
+            &rc_path,
+            format!("# existing stuff\n{}\nlab() {{ }}\n", MARKER),
+        )
+        .unwrap();
 
         let contents = fs::read_to_string(&rc_path).unwrap();
         assert!(contents.contains(MARKER), "marker should be present");

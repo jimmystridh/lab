@@ -95,7 +95,11 @@ impl Fuzzy {
             .collect();
 
         // Sort by score descending
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Limit results
         results.truncate(limit);
@@ -226,10 +230,7 @@ mod tests {
 
     #[test]
     fn test_non_matching_query_returns_none() {
-        let entries = vec![
-            make_entry("alpha", 0.0),
-            make_entry("beta", 0.0),
-        ];
+        let entries = vec![make_entry("alpha", 0.0), make_entry("beta", 0.0)];
         let fuzzy = Fuzzy::new(&entries);
         let results = fuzzy.match_entries("xyz", 10);
         assert!(results.is_empty(), "xyz should not match any entry");
@@ -334,10 +335,7 @@ mod tests {
 
     #[test]
     fn test_density_multiplier_prefers_concentrated_matches() {
-        let entries = vec![
-            make_entry("abcdef", 0.0),
-            make_entry("a----b", 0.0),
-        ];
+        let entries = vec![make_entry("abcdef", 0.0), make_entry("a----b", 0.0)];
         let fuzzy = Fuzzy::new(&entries);
         let results = fuzzy.match_entries("ab", 10);
         assert_eq!(results.len(), 2);
@@ -355,7 +353,7 @@ mod tests {
     fn test_date_prefix_bonus() {
         let entries = vec![
             make_entry("2025-01-15-project", 2.0), // base_score includes +2.0 date bonus
-            make_entry("project", 0.0),             // base_score with no date bonus
+            make_entry("project", 0.0),            // base_score with no date bonus
         ];
         let fuzzy = Fuzzy::new(&entries);
         let results = fuzzy.match_entries("proj", 10);

@@ -611,7 +611,11 @@ fn build_rename_prompt_line(input: &str, cursor_pos: usize, width: u16) -> Style
     centered_segments_line(width, segments, Background::None)
 }
 
-fn build_graduate_hint_line(destination_hint: &str, destination_root: &str, width: u16) -> StyledLine {
+fn build_graduate_hint_line(
+    destination_hint: &str,
+    destination_root: &str,
+    width: u16,
+) -> StyledLine {
     centered_line(
         width,
         &format!("Destination ({destination_hint}: {destination_root})"),

@@ -418,10 +418,7 @@ impl App {
         let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let dest = expand_input_path(trimmed, &cwd);
         if dest.exists() {
-            return self.graduate_error(format!(
-                "Destination already exists: {}",
-                dest.display()
-            ));
+            return self.graduate_error(format!("Destination already exists: {}", dest.display()));
         }
 
         let parent = dest.parent().unwrap_or_else(|| Path::new("/"));
@@ -939,7 +936,11 @@ fn resolve_dimension(override_value: Option<&str>, detected: u16, default: u16) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fs, path::{Path, PathBuf}, time::SystemTime};
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+        time::SystemTime,
+    };
 
     fn make_entry(name: &str, score: f64) -> Entry {
         Entry {

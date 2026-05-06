@@ -32,7 +32,10 @@ pub fn parse_git_uri(uri: &str) -> Option<ParsedGitUri> {
     let uri = uri.strip_suffix(".git").unwrap_or(uri);
 
     // Try HTTPS format: https://host/user/repo
-    if let Some(rest) = uri.strip_prefix("https://").or_else(|| uri.strip_prefix("http://")) {
+    if let Some(rest) = uri
+        .strip_prefix("https://")
+        .or_else(|| uri.strip_prefix("http://"))
+    {
         // Split host from path
         let parts: Vec<&str> = rest.splitn(2, '/').collect();
         if parts.len() != 2 {
