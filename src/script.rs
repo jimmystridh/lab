@@ -719,8 +719,11 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let source = dir.path().join("2025-06-01-worktree");
         std::fs::create_dir_all(&source).expect("mkdir source");
-        std::fs::write(source.join(".git"), "gitdir: /tmp/repo/.git/worktrees/worktree")
-            .expect("write git file");
+        std::fs::write(
+            source.join(".git"),
+            "gitdir: /tmp/repo/.git/worktrees/worktree",
+        )
+        .expect("write git file");
         let dest = dir.path().join("projects").join("worktree");
 
         let cmds = script_graduate(

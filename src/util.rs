@@ -61,7 +61,8 @@ pub fn resolve_unique_name(labs_path: &str, date_prefix: &str, base: &str) -> St
         let mut candidate_num = num + 1;
         loop {
             let candidate_base = format!("{}{}", stem, candidate_num);
-            let candidate_full = Path::new(labs_path).join(format!("{}-{}", date_prefix, candidate_base));
+            let candidate_full =
+                Path::new(labs_path).join(format!("{}-{}", date_prefix, candidate_base));
             if !candidate_full.exists() {
                 return candidate_base;
             }

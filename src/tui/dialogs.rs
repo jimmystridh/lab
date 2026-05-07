@@ -458,7 +458,10 @@ mod tests {
 
         assert_eq!(dialog.current_name, "2025-11-02-coolproject");
         assert_eq!(dialog.input, "/tmp/projects/coolproject");
-        assert_eq!(dialog.cursor_pos, "/tmp/projects/coolproject".chars().count());
+        assert_eq!(
+            dialog.cursor_pos,
+            "/tmp/projects/coolproject".chars().count()
+        );
         assert_eq!(dialog.destination_hint, "parent of $LAB_PATH");
         assert_eq!(dialog.destination_root, "/tmp/projects");
         assert_eq!(dialog.error, None);
@@ -466,7 +469,12 @@ mod tests {
 
     #[test]
     fn test_graduate_dialog_allows_path_chars_but_rejects_other_disallowed_chars() {
-        let mut dialog = GraduateDialog::new("alpha", "/tmp/projects/alpha", "$LAB_PROJECTS", "/tmp/projects");
+        let mut dialog = GraduateDialog::new(
+            "alpha",
+            "/tmp/projects/alpha",
+            "$LAB_PROJECTS",
+            "/tmp/projects",
+        );
         dialog.insert_char('/');
         dialog.insert_char('~');
         dialog.insert_char('!');
