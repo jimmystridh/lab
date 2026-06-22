@@ -50,13 +50,17 @@ pub fn script_cd(path: &str) -> Vec<String> {
     ]
 }
 
-/// Build commands for creating a new directory and cd-ing into it.
+/// Build commands for creating a new directory, initializing git, and cd-ing into it.
 ///
-/// Creates the directory with `mkdir -p`, then does the standard
-/// touch + echo + cd sequence.
+/// Creates the directory with `mkdir -p`, initializes an empty git repo,
+/// then does the standard touch + echo + cd sequence.
 #[allow(dead_code)]
 pub fn script_mkdir_cd(path: &str) -> Vec<String> {
-    let mut cmds = vec![format!("mkdir -p {}", quote_path(path))];
+    let quoted_path = quote_path(path);
+    let mut cmds = vec![
+        format!("mkdir -p {}", quoted_path),
+        format!("git -C {} init --quiet", quoted_path),
+    ];
     cmds.extend(script_cd(path));
     cmds
 }
@@ -401,18 +405,49 @@ mod tests {
     #[test]
     fn test_script_mkdir_cd_basic() {
         let cmds = script_mkdir_cd("/tmp/newdir");
-        assert_eq!(cmds.len(), 4);
+        assert_eq!(cmds.len(), 5);
         assert_eq!(cmds[0], "mkdir -p '/tmp/newdir'");
-        assert_eq!(cmds[1], "touch '/tmp/newdir'");
-        assert_eq!(cmds[2], "echo '/tmp/newdir'");
-        assert_eq!(cmds[3], "cd '/tmp/newdir'");
+        assert_eq!(cmds[1], "git -C '/tmp/newdir' init --quiet");
+        assert_eq!(cmds[2], "touch '/tmp/newdir'");
+        assert_eq!(cmds[3], "echo '/tmp/newdir'");
+        assert_eq!(cmds[4], "cd '/tmp/newdir'");
     }
 
     #[test]
     fn test_script_mkdir_cd_with_special_chars() {
         let cmds = script_mkdir_cd("/tmp/2025-01-15-it's-a-test");
         assert_eq!(cmds[0], "mkdir -p '/tmp/2025-01-15-it'\"'\"'s-a-test'");
-        assert_eq!(cmds[3], "cd '/tmp/2025-01-15-it'\"'\"'s-a-test'");
+        assert_eq!(
+            cmds[1],
+            "git -C '/tmp/2025-01-15-it'\"'\"'s-a-test' init --quiet"
+        );
+        assert_eq!(cmds[4], "cd '/tmp/2025-01-15-it'\"'\"'s-a-test'");
+    }
+
+    #[test]
+    fn test_script_mkdir_cd_executes_git_init() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join("new lab");
+        let cmds = script_mkdir_cd(target.to_str().expect("target path"));
+        let output = capture_emit_script(&cmds);
+
+        let status = Command::new("/bin/bash")
+            .env("LAB_EMITTED_SCRIPT", &output)
+            .arg("-c")
+            .arg("set -euo pipefail\neval \"$LAB_EMITTED_SCRIPT\"")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .expect("eval mkdir script");
+
+        assert!(
+            status.success(),
+            "expected emitted mkdir script to succeed, got {status:?}"
+        );
+        assert!(
+            target.join(".git").is_dir(),
+            "expected created lab to contain a .git directory"
+        );
     }
 
     // ---- script_clone tests ----
@@ -792,12 +827,13 @@ mod tests {
         let cmds = script_mkdir_cd("/tmp/newdir");
         let output = capture_emit_script(&cmds);
         let lines: Vec<&str> = output.lines().collect();
-        assert_eq!(lines.len(), 5);
+        assert_eq!(lines.len(), 6);
         assert_eq!(lines[0], SCRIPT_WARNING);
         assert_eq!(lines[1], "mkdir -p '/tmp/newdir' && \\");
-        assert_eq!(lines[2], "  touch '/tmp/newdir' && \\");
-        assert_eq!(lines[3], "  echo '/tmp/newdir' && \\");
-        assert_eq!(lines[4], "  cd '/tmp/newdir'");
+        assert_eq!(lines[2], "  git -C '/tmp/newdir' init --quiet && \\");
+        assert_eq!(lines[3], "  touch '/tmp/newdir' && \\");
+        assert_eq!(lines[4], "  echo '/tmp/newdir' && \\");
+        assert_eq!(lines[5], "  cd '/tmp/newdir'");
     }
 
     #[test]

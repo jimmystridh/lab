@@ -238,7 +238,7 @@ Selection can result in three action types:
 | Action | Trigger | Result |
 |--------|---------|--------|
 | CD | Select existing directory | Navigate to directory |
-| MKDIR | Select "[new]" entry | Create and navigate to new directory |
+| MKDIR | Select "[new]" entry | Create a git-initialized directory and navigate to it |
 | DELETE | Press Ctrl-D on entry | Show delete confirmation dialog |
 | CANCEL | Press Esc | Exit without action |
 
@@ -249,6 +249,7 @@ When query doesn't match any existing directory:
 - Show "[new] query-text" as first option
 - Selecting creates `YYYY-MM-DD-query-text` directory
 - New directory is created in labs base path
+- New directory is initialized as a git repository unless creation uses the worktree path
 
 ## Directory Deletion
 

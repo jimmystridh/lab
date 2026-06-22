@@ -255,7 +255,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mkdir_outcome_uses_plain_mkdir_commands_even_when_labs_path_is_git_repo() {
+    fn test_mkdir_outcome_uses_plain_git_initialized_commands_even_when_labs_path_is_git_repo() {
         let dir = tempfile::tempdir().expect("tempdir");
         fs::create_dir(dir.path().join(".git")).expect("git dir");
         let path = dir.path().join("2026-04-13-feature");
@@ -267,6 +267,7 @@ mod tests {
             commands,
             vec![
                 format!("mkdir -p '{}'", path.to_string_lossy()),
+                format!("git -C '{}' init --quiet", path.to_string_lossy()),
                 format!("touch '{}'", path.to_string_lossy()),
                 format!("echo '{}'", path.to_string_lossy()),
                 format!("cd '{}'", path.to_string_lossy()),

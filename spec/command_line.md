@@ -42,7 +42,7 @@ lab exec [query]        # equivalent to: lab exec cd [query]
 
 **Actions:**
 - Select existing directory → touch and cd
-- Select "[new]" entry → mkdir and cd (creates `YYYY-MM-DD-query`)
+- Select "[new]" entry → mkdir, git init, and cd (creates `YYYY-MM-DD-query`)
 - Press Esc → cancel (exit 1)
 
 ### clone

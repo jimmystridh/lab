@@ -53,7 +53,7 @@ lab install ~/src/labs
 | --- | --- |
 | `lab`, `lab <query>`, or `lab cd [query]` | Open the interactive selector, optionally with an initial search query. |
 | `lab clone <url> [name]` | Clone a repository into a dated lab such as `YYYY-MM-DD-user-repo` or `YYYY-MM-DD-name`. |
-| `lab worktree <name>` | Create a dated worktree from the current Git repo; outside Git it falls back to creating a normal directory. |
+| `lab worktree <name>` | Create a dated worktree from the current Git repo; outside Git it falls back to creating a git-initialized directory. |
 | `lab . <name>` | Dot shorthand that uses the current directory as the worktree source with the same Git/fallback behavior. |
 
 ## Environment variables
